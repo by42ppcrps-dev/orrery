@@ -1,5 +1,7 @@
 import Foundation
 import CryptoKit
+import SwiftUI
+import AppKit
 import OrreryRemoteProtocol
 import OrreryRemoteClient
 
@@ -101,11 +103,12 @@ enum AuditActivity {
             let restored = RemoteHub(read: { saved }, write: { saved = $0 }, identityProvider: { key })
             restored.load()
             audit.check("both pairings survive a fresh hub without persisting transcripts", restored.clients.count == 2 && restored.clients.allSatisfy { $0.state == nil && !$0.isLive })
-            a.forget()
+            await forgetNavigation(a, audit: audit, succeeds: true)
             audit.check("forgetting one Mac preserves the other pairing", saved.count == 1 && saved.first?.serverPublicKey == second.serverPublicKey && hub.clients.count == 1)
             var failWrite = true
             let protected = RemoteHub(read: { saved }, write: { _ in if failWrite { throw CocoaError(.fileWriteNoPermission) } }, identityProvider: { key })
-            protected.load(); protected.clients.first?.forget()
+            protected.load()
+            if let client = protected.clients.first { await forgetNavigation(client, audit: audit, succeeds: false) }
             audit.check("a storage failure cannot pretend a Mac was forgotten", protected.clients.count == 1 && protected.clients.first?.mac != nil && protected.clients.first?.lastError != nil)
             failWrite = false
             let blocked = RemoteHub(read: { throw CocoaError(.fileReadNoPermission) }, write: { _ in }, identityProvider: { key })
@@ -121,6 +124,11 @@ enum AuditActivity {
         audit.check("new activity fields round-trip without replacing the selected conversation", RemotePayload.decode(RemotePayload(state: bounded).encoded())?.state == bounded)
         audit.check("activity search matches a project without inventing rows", state.matchingActivities(query: "large", scope: .working).count == 1000 && state.matchingActivities(query: "missing", scope: .all).isEmpty)
         audit.check("decision filter excludes work with no pending approvals", state.matchingActivities(query: "", scope: .decisions).isEmpty)
+        audit.check("a populated activity filter has no empty-state message", state.activityEmptyMessage(query: "", scope: .working) == nil)
+        audit.check("a decision filter with no decisions explains the empty view", state.activityEmptyMessage(query: "", scope: .decisions) == "No decisions waiting.")
+        audit.check("an unmatched search explains the empty view", state.activityEmptyMessage(query: "missing", scope: .all) == "No matching activity.")
+        var idle = state; idle.activities = [row]; idle.activities?[0].isBusy = false
+        audit.check("an idle host explains an empty working filter", idle.activityEmptyMessage(query: "", scope: .working) == "No agents are working.")
         let id = UUID().uuidString
         audit.check("relay data preserves an opaque session envelope", RelayPacket.decode(RelayPacket(type: "relay.data", id: id, data: "sealed-envelope").encoded())?.data == "sealed-envelope")
         audit.check("malformed relay channels and oversized messages are refused", RelayPacket.decode(RelayPacket(type: "relay.open", id: "invalid").encoded()) == nil && RelayPacket.decode(Data(count: RelayPacket.maxBytes + 1)) == nil)
@@ -150,9 +158,15 @@ enum AuditActivity {
             defer { try? traceHandle?.close() }
             do { try process.run() } catch { audit.check("local relay runtime starts", false, error.localizedDescription); return }
             defer { if process.isRunning { process.terminate() } }
-            guard await wait({ FileManager.default.fileExists(atPath: portFile.path) }),
+            let ready = await wait(seconds: ProcessInfo.processInfo.environment["CI"] == nil ? 6 : 20) {
+                let value = try? String(contentsOf: portFile, encoding: .utf8)
+                return value.flatMap(UInt16.init) != nil || !process.isRunning
+            }
+            guard ready,
                   let rawPort = try? String(contentsOf: portFile, encoding: .utf8), let port = UInt16(rawPort) else {
-                audit.check("local relay runtime exposes its test port", false); return
+                let output = (try? String(contentsOf: trace, encoding: .utf8)) ?? "No runtime output"
+                let status = process.isRunning ? "startup timed out" : "exit \(process.terminationStatus)"
+                audit.check("local relay runtime exposes its test port", false, "\(status): \(output.suffix(4000))"); return
             }
             let model = AppModel(trust: .forAudit)
             let project = dir.appendingPathComponent("project")
@@ -193,6 +207,40 @@ enum AuditActivity {
             audit.check("relay revocation drops one viewer and keeps the other updating", await wait { !a.isLive && b.isLive && control.connectedDevices.count == 1 })
             b.connect()
             audit.check("a relay viewer reconnects after revocation of its peer", await wait { b.isLive && b.state?.mode == "Solo" })
+        }
+    }
+
+    @MainActor
+    private final class NavigationProbe: ObservableObject {
+        @Published var path = [1]
+        var appeared = false
+    }
+
+    private struct NavigationFixture: View {
+        @ObservedObject var probe: NavigationProbe
+        let client: RemoteClient
+        var body: some View {
+            NavigationStack(path: $probe.path) {
+                Text("Activity").navigationDestination(for: Int.self) { _ in
+                    RemoteSessionView().environmentObject(client).onAppear { probe.appeared = true }
+                }
+            }
+        }
+    }
+
+    private static func forgetNavigation(_ client: RemoteClient, audit: Auditor, succeeds: Bool) async {
+        let probe = NavigationProbe()
+        let view = NSHostingView(rootView: NavigationFixture(probe: probe, client: client))
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 700, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = view; window.layoutIfNeeded()
+        defer { window.contentView = nil }
+        audit.check("the shipping conversation is mounted for the \(succeeds ? "successful" : "failed") forget flow", await wait { view.layoutSubtreeIfNeeded(); return probe.appeared })
+        client.forget()
+        if succeeds {
+            audit.check("forgetting a Mac returns its visible conversation to Activity", await wait { probe.path.isEmpty })
+        } else {
+            try? await Task.sleep(for: .milliseconds(150))
+            audit.check("failed secure removal keeps its conversation open", probe.path == [1] && client.mac != nil)
         }
     }
 

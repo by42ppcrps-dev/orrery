@@ -1,4 +1,4 @@
-# Orrery Remote 1.3 (4)
+# Orrery Remote 1.3 (5)
 
 The iPhone and iPad companion for Orrery 1.10.0. Activity shows open projects, Solo agents,
 Team tasks, Roundtable and native CLI session status across up to eight paired Macs. Each

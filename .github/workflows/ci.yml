@@ -28,6 +28,8 @@ jobs:
         run: npm ci && npm test
       - name: Build
         run: swift build
+      - name: Cross-device smoke check
+        run: .build/debug/Orrery --audit --activity-only
       - name: Headless audit (no provider quota is used)
         run: .build/debug/Orrery --audit
       - name: Tests

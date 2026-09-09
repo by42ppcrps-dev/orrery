@@ -20,8 +20,9 @@ private struct OrbitMark: View {
     }
 }
 
-struct SessionView: View {
+public struct RemoteSessionView: View {
     @EnvironmentObject private var client: RemoteClient
+    @Environment(\.dismiss) private var dismiss
     @State private var target = "solo"
     @State private var provider = ""
     @State private var showProjects = false
@@ -34,7 +35,9 @@ struct SessionView: View {
     private var draftKey: String { [state?.projectID ?? "default", state?.mode ?? "solo", state?.provider ?? ""].joined(separator: ":") }
     private var draft: Binding<String> { Binding(get: { client.drafts[draftKey] ?? "" }, set: { client.drafts[draftKey] = $0 }) }
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         VStack(spacing: 0) {
             projectHeader
             if client.selecting { ProgressView("Opening conversation…").padding(8) }
@@ -73,6 +76,9 @@ struct SessionView: View {
         .onChange(of: state?.projectID) { _, _ in updateMode(); provider = state?.provider ?? ""; followLatest = true }
         .onChange(of: state?.mode) { _, _ in updateMode() }
         .onChange(of: state?.provider) { _, name in provider = name ?? "" }
+        .onChange(of: client.mac?.deviceID) { _, deviceID in
+            if deviceID == nil { dismiss() }
+        }
     }
 
     private func updateMode() {

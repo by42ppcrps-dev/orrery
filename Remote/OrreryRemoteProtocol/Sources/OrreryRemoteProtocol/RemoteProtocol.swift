@@ -370,6 +370,18 @@ public enum ActivityScope: String, CaseIterable, Sendable {
     case all = "All", working = "Working", decisions = "Decisions"
 }
 public extension RemoteState {
+    func activityEmptyMessage(query: String, scope: ActivityScope) -> String? {
+        guard let activities else { return nil }
+        if activities.isEmpty { return "Open a project on this Mac to begin." }
+        guard matchingActivities(query: query, scope: scope).isEmpty else { return nil }
+        if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "No matching activity." }
+        switch scope {
+        case .all: return "No matching activity."
+        case .working: return "No agents are working."
+        case .decisions: return "No decisions waiting."
+        }
+    }
+
     func matchingActivities(query: String, scope: ActivityScope) -> [Activity] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return (activities ?? []).filter { row in

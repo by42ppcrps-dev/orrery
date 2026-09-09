@@ -11,6 +11,8 @@
 | A replaced relay socket could close a new session | Socket identity guards and explicit close coordination; reconnect and replacement tests. |
 | Binary frames changed type in the Workers runtime | Explicit array-buffer decoding; real binary WebSocket regression. |
 | Public source archive omitted relay implementation and deployment configuration | Include JavaScript and TOML while excluding dependencies and local state; archive-content regression. |
+| Forgetting a Mac left its empty conversation on screen | Return to Activity after secure removal; the shipping SwiftUI navigation is exercised for successful and failed removal. |
+| Empty activity filters showed no explanation | Shared working, decision and search messages, with behavior checks. |
 
 ## Addressed in 1.9.0
 

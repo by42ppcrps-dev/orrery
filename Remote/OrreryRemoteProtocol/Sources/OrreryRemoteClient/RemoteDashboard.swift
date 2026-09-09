@@ -97,21 +97,20 @@ private struct DeviceActivitySection: View {
                 Button("Reconnect this Mac") { client.connect() }
             }
             if let state = client.state {
-                if let rows = state.activities {
+                if state.activities != nil {
                     ForEach(state.matchingActivities(query: query, scope: scope)) { row in
                         NavigationLink {
-                            SessionView().environmentObject(client).task { client.selectActivity(row) }
+                            RemoteSessionView().environmentObject(client).task { client.selectActivity(row) }
                         } label: { ActivityRow(row: row, live: client.isLive) }
                         .disabled(!client.isLive || client.sending || client.selecting)
                     }
                     activityLimitNotice(state)
-                    if !rows.isEmpty && state.matchingActivities(query: query, scope: scope).isEmpty { Text("No matching activity.").foregroundStyle(.secondary) }
-                    if rows.isEmpty { Text("No projects open. Open a project on this Mac to begin.").foregroundStyle(.secondary) }
+                    if let message = state.activityEmptyMessage(query: query, scope: scope) { Text(message).foregroundStyle(.secondary) }
                 } else {
                     Text("Update Orrery on this Mac to see activity across all agents.").foregroundStyle(.secondary)
                 }
             }
-            NavigationLink("Connection and conversation") { SessionView().environmentObject(client) }
+            NavigationLink("Connection and conversation") { RemoteSessionView().environmentObject(client) }
         }
     }
 }
@@ -122,7 +121,7 @@ private func activityRows(_ state: RemoteState, query: String, scope: ActivitySc
         Button { select(row) } label: { ActivityRow(row: row, live: enabled) }.buttonStyle(.plain)
     }
     activityLimitNotice(state)
-    if state.activities?.isEmpty != false { Text("Open a project on this Mac to begin.").foregroundStyle(.secondary) }
+    if let message = state.activityEmptyMessage(query: query, scope: scope) { Text(message).foregroundStyle(.secondary) }
 }
 
 @ViewBuilder
