@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NAME="Orrery"
 IDENTIFIER="app.orrery.studio"
 VERSION="1.10.0"
-BUILD="39"
+BUILD="40"
 MODE="build"
 PLAN=0
 for argument in "$@"; do

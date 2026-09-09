@@ -73,11 +73,13 @@ enum AuditActivity {
                 a.state?.activities?.contains { $0.project == "workspace-0" && $0.provider == "claude" && $0.isBusy } == true && viewer.state?.activities?.contains { $0.project == "workspace-0" && $0.provider == "claude" && $0.isBusy } == true && a.state?.projectID == secondProject && viewer.state?.mode == "Team"
             })
             a.connect()
-            audit.check("reconnecting preserves the selected project, mode and provider", await wait { a.isLive && a.state?.projectID == secondProject && a.state?.provider == "claude" && a.state?.mode == "Solo" })
+            // A fresh transport can be live while the last snapshot remains cached.
+            // Controls stay gated until the new connection confirms this selection.
+            audit.check("reconnecting preserves the selected project, mode and provider", await wait { a.isLive && !a.selecting && a.state?.projectID == secondProject && a.state?.provider == "claude" && a.state?.mode == "Solo" })
             let grok = models[1].backends[.grok] as? ScriptedBackend
             let claude = models[1].backends[.claude] as? ScriptedBackend
             await a.stop()
-            audit.check("Stop targets the viewed agent and leaves other agents alone", claude?.cancelCount == 1 && grok?.cancelCount == 0 && models[1].provider == .grok)
+            audit.check("Stop targets the viewed agent and leaves other agents alone", await wait { claude?.cancelCount == 1 && grok?.cancelCount == 0 && models[1].provider == .grok }, "Claude: \(claude?.cancelCount ?? -1), Grok: \(grok?.cancelCount ?? -1), selecting: \(a.selecting), error: \(a.lastError ?? "none")")
             var decision: String?
             models[1].handle(.permission(.init(title: "Approve the selected project", detail: "audit", options: [.init(id: "deny", name: "Deny", kind: "reject_once")], reply: { decision = $0 })), from: .claude)
             audit.check("pending decisions update the all-project dashboard", await wait { a.state?.activities?.contains { $0.projectID == secondProject && $0.approvalCount > 0 } == true && a.state?.permissions.isEmpty == false })
@@ -206,7 +208,7 @@ enum AuditActivity {
             control.revoke(a.mac?.deviceID ?? "missing")
             audit.check("relay revocation drops one viewer and keeps the other updating", await wait { !a.isLive && b.isLive && control.connectedDevices.count == 1 })
             b.connect()
-            audit.check("a relay viewer reconnects after revocation of its peer", await wait { b.isLive && b.state?.mode == "Solo" })
+            audit.check("a relay viewer reconnects after revocation of its peer", await wait { b.isLive && !b.selecting && b.state?.mode == "Solo" })
         }
     }
 
