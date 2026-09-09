@@ -1,0 +1,5 @@
+{
+  "commands": [
+    {"title": "audit", "executable": ".build/debug/Orrery", "arguments": ["--audit"]}
+  ]
+}

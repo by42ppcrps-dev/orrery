@@ -1,0 +1,279 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		000A11CE000000000000001C = {isa = PBXBuildFile; fileRef = 000A11CE000000000000001D; };
+		000A11CE0000000000000015 /* OrreryRemoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000A11CE0000000000000010 /* OrreryRemoteApp.swift */; };
+		000A11CE0000000000000016 /* RemoteClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000A11CE0000000000000011 /* RemoteClient.swift */; };
+		000A11CE0000000000000017 /* ScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000A11CE0000000000000012 /* ScannerView.swift */; };
+		000A11CE0000000000000018 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000A11CE0000000000000014 /* Assets.xcassets */; };
+		000A11CE000000000000001B /* OrreryRemoteProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 000A11CE000000000000001A /* OrreryRemoteProtocol */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		000A11CE000000000000001D = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		000A11CE000000000000000C /* OrreryRemote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OrreryRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000A11CE0000000000000010 /* OrreryRemoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrreryRemoteApp.swift; sourceTree = "<group>"; };
+		000A11CE0000000000000011 /* RemoteClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClient.swift; sourceTree = "<group>"; };
+		000A11CE0000000000000012 /* ScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerView.swift; sourceTree = "<group>"; };
+		000A11CE0000000000000013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		000A11CE0000000000000014 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000A11CE000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000A11CE000000000000001B /* OrreryRemoteProtocol in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000A11CE0000000000000009 = {
+			isa = PBXGroup;
+			children = (
+				000A11CE000000000000000B /* OrreryRemote */,
+				000A11CE000000000000000A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000A11CE000000000000000A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000A11CE000000000000000C /* OrreryRemote.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		000A11CE000000000000000B /* OrreryRemote */ = {
+			isa = PBXGroup;
+			children = (
+				000A11CE0000000000000010 /* OrreryRemoteApp.swift */,
+				000A11CE0000000000000011 /* RemoteClient.swift */,
+				000A11CE0000000000000012 /* ScannerView.swift */,
+				000A11CE0000000000000014 /* Assets.xcassets */,
+				000A11CE0000000000000013 /* Info.plist */,
+				000A11CE000000000000001D,
+			);
+			path = OrreryRemote;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000A11CE0000000000000002 /* OrreryRemote */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000A11CE0000000000000004 /* Build configuration list for PBXNativeTarget "OrreryRemote" */;
+			buildPhases = (
+				000A11CE000000000000000D /* Sources */,
+				000A11CE000000000000000E /* Frameworks */,
+				000A11CE000000000000000F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OrreryRemote;
+			packageProductDependencies = (
+				000A11CE000000000000001A /* OrreryRemoteProtocol */,
+			);
+			productName = OrreryRemote;
+			productReference = 000A11CE000000000000000C /* OrreryRemote.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000A11CE0000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					000A11CE0000000000000002 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+				};
+			};
+			buildConfigurationList = 000A11CE0000000000000003 /* Build configuration list for PBXProject "OrreryRemote" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000A11CE0000000000000009;
+			packageReferences = (
+				000A11CE0000000000000019 /* XCLocalSwiftPackageReference "../OrreryRemoteProtocol" */,
+			);
+			productRefGroup = 000A11CE000000000000000A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000A11CE0000000000000002 /* OrreryRemote */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		000A11CE000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000A11CE0000000000000018 /* Assets.xcassets in Resources */,
+				000A11CE000000000000001C,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000A11CE000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000A11CE0000000000000015 /* OrreryRemoteApp.swift in Sources */,
+				000A11CE0000000000000016 /* RemoteClient.swift in Sources */,
+				000A11CE0000000000000017 /* ScannerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		000A11CE0000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		000A11CE0000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		000A11CE0000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OrreryRemote/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = app.orrery.remote;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		000A11CE0000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OrreryRemote/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = app.orrery.remote;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000A11CE0000000000000003 /* Build configuration list for PBXProject "OrreryRemote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000A11CE0000000000000005 /* Debug */,
+				000A11CE0000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000A11CE0000000000000004 /* Build configuration list for PBXNativeTarget "OrreryRemote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000A11CE0000000000000007 /* Debug */,
+				000A11CE0000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		000A11CE0000000000000019 /* XCLocalSwiftPackageReference "../OrreryRemoteProtocol" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../OrreryRemoteProtocol;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		000A11CE000000000000001A /* OrreryRemoteProtocol */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OrreryRemoteProtocol;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 000A11CE0000000000000001 /* Project object */;
+}

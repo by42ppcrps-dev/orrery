@@ -1,0 +1,25 @@
+# SwiftPM and app bundles
+.build/
+build/
+.swiftpm/
+*.dSYM/
+
+# Session scratch (screenshots, helper binaries, run notes)
+scratchpad/
+
+# macOS
+.DS_Store
+
+# Private verification output and credentials (never public source)
+docs/verification-*/
+.public-guard-terms
+__pycache__/
+.env
+.env.*
+*.p12
+*.mobileprovision
+*.provisionprofile
+
+# Cloudflare Worker local state
+Remote/OrreryRelay/.wrangler/
+Remote/OrreryRelay/node_modules/

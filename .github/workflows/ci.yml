@@ -1,0 +1,35 @@
+# Builds the package and runs the headless audit, swift test, the Python tests, the public
+# export and the public guard on a GitHub-hosted macOS runner. Checks that need an installed
+# CLI or a real Team-stats store print SKIP there; sourcekit-lsp waits stretch under CI.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build-and-audit:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Toolchain
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app 2>/dev/null || sudo xcode-select -s /Applications/Xcode.app
+          swift --version
+      - name: Build
+        run: swift build
+      - name: Headless audit (no provider quota is used)
+        run: .build/debug/Orrery --audit
+      - name: Tests
+        run: swift test
+      - name: Installer and public export checks
+        run: python3 -m unittest discover -s Tests -p 'test_*.py'
+      - name: Verify public source package
+        run: python3 scripts/export_public.py
+      - name: Public tree and history guard
+        run: |
+          git config user.name 'Orrery Maintainers'
+          git config user.email 'maintainers@users.noreply.github.com'
+          python3 scripts/public_guard.py --history HEAD
