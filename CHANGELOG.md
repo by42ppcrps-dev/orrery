@@ -8,6 +8,9 @@
 - Clean up concurrency warnings, scoped locking, redundant optionals and weak editor captures; correct the contributor language-mode guidance.
 - Add regression checks for action size, attachment-window routing and generated Python caches.
 - Include the repository audit gate in source archives so a fresh download retains its Team acceptance checks and passes its own audit.
+- Keep a staged release available after building a preview, and simplify the Roundtable composer to one outline.
+- Finish first-time installation successfully when there is no previous app bundle to clean up.
+- Refresh CI to pinned Node 24 action releases with read-only repository permissions.
 
 ## 1.10.0 (build 40) — 2026-09-09
 

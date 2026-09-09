@@ -173,9 +173,7 @@ struct RoundtableView: View {
             TextEditor(text: $draft)
                 .font(.system(size: 14)).scrollContentBackground(.hidden)
                 .frame(height: 68).focused($composerFocused)
-                .padding(10)
-                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(StudioStyle.border))
+                .padding(.horizontal, 4).padding(.vertical, 8)
                 .accessibilityLabel("Roundtable message")
             HStack {
                 Text("@ an agent to address them · ⌘↩ to send").font(.caption2).foregroundStyle(.secondary)

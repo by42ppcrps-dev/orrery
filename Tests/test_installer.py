@@ -10,7 +10,7 @@ import unittest
 SCRIPT = Path(__file__).resolve().parents[1] / 'build-app.sh'
 
 class StagedInstallTests(unittest.TestCase):
-    def run_swap(self, root, running=False, valid=True):
+    def run_swap(self, root, running=False, valid=True, arguments=None):
         source = SCRIPT.read_text().replace('/Applications/$NAME.app', '$ROOT/destination/$NAME.app')
         source = source.replace('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', '/usr/bin/true')
         script = root / 'build-app.sh'
@@ -21,8 +21,14 @@ class StagedInstallTests(unittest.TestCase):
             tool = binary / name
             tool.write_text('#!/bin/sh\nexit ' + str(status) + '\n')
             tool.chmod(0o755)
-        env = dict(os.environ, PATH=str(binary)+':/usr/bin:/bin:/usr/sbin:/sbin', ORRERY_AUTO_SIGN='0', ORRERY_SIGN_IDENTITY='')
-        return subprocess.run(['/bin/bash', str(script), '--swap'], env=env, capture_output=True, text=True, timeout=15)
+        compiled = root / 'compiler-output'
+        compiled.mkdir(exist_ok=True)
+        (compiled/'Orrery').write_text('#!/bin/sh\nexit 0\n')
+        (compiled/'Orrery').chmod(0o755)
+        (binary/'swift').write_text('#!/bin/sh\ncase "$*" in *--show-bin-path*) echo "$ORRERY_FIXTURE_BIN" ;; esac\n')
+        (binary/'swift').chmod(0o755)
+        env = dict(os.environ, PATH=str(binary)+':/usr/bin:/bin:/usr/sbin:/sbin', ORRERY_AUTO_SIGN='0', ORRERY_SIGN_IDENTITY='', ORRERY_FIXTURE_BIN=str(compiled))
+        return subprocess.run(['/bin/bash', str(script), *(arguments or ['--swap'])], env=env, capture_output=True, text=True, timeout=15)
 
     def fixture(self, root):
         stage = root / 'build/staging.fixture/Orrery.app'
@@ -54,6 +60,34 @@ class StagedInstallTests(unittest.TestCase):
             result = self.run_swap(root, running=True)
             self.assertEqual(result.returncode, 2)
             self.assertEqual((destination/'payload').read_text(), 'original build')
+
+    def test_first_install_succeeds_without_a_previous_bundle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, destination = self.fixture(root)
+            (destination/'payload').unlink()
+            destination.rmdir()
+            result = self.run_swap(root)
+            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+            self.assertEqual((destination/'payload').read_text(), 'new verified build')
+            self.assertIn('Ready: '+str(destination), result.stdout)
+
+    def test_preview_preserves_the_release_waiting_for_installation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stage, destination = self.fixture(root)
+            obsolete = root/'build/staging.obsolete'
+            obsolete.mkdir()
+            result = self.run_swap(root, arguments=['--preview'])
+            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+            self.assertTrue((root/'build/OrreryPreview.app/Contents/MacOS/Orrery').is_file())
+            self.assertTrue(stage.is_dir(), 'a preview must not delete the pending release')
+            self.assertEqual((root/'build/next-app-path').read_text().strip(), str(stage))
+            self.assertFalse(obsolete.exists(), 'unreferenced staging folders should still be removed')
+            self.assertEqual((destination/'payload').read_text(), 'original build')
+            installed = self.run_swap(root)
+            self.assertEqual(installed.returncode, 0, installed.stdout+installed.stderr)
+            self.assertEqual((destination/'payload').read_text(), 'new verified build')
 
     def test_failed_signature_is_untouched(self):
         with tempfile.TemporaryDirectory() as directory:

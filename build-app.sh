@@ -175,7 +175,16 @@ fi
 mv "$NEXT" "$DESTINATION"
 # Keep one previous copy for rollback. Older copies piled up (110 of them once) and Launch
 # Services happily launched one of them for `open -a Orrery`, so two builds ran at once.
-ls -dt "$ROOT"/build/previous.* 2>/dev/null | tail -n +2 | while IFS= read -r old; do rm -rf "$old"; done
-for leftover in "$ROOT"/build/staging.*; do [ -e "$leftover" ] || continue; [ "$leftover" = "$STAGING_ROOT" ] || rm -rf "$leftover"; done
+if compgen -G "$ROOT/build/previous.*" >/dev/null; then
+  ls -dt "$ROOT"/build/previous.* 2>/dev/null | tail -n +2 | while IFS= read -r old; do rm -rf "$old"; done
+fi
+# A preview must not discard the release recorded for a later --swap.
+RECORDED_STAGE="$(cat "$STAGED_RECORD" 2>/dev/null || true)"
+for leftover in "$ROOT"/build/staging.*; do
+  [ -e "$leftover" ] || continue
+  [ "$leftover" = "$STAGING_ROOT" ] && continue
+  [ "$leftover/$NAME.app" = "$RECORDED_STAGE" ] && continue
+  rm -rf "$leftover"
+done
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$DESTINATION" >/dev/null 2>&1 || true
 echo "Ready: $DESTINATION"

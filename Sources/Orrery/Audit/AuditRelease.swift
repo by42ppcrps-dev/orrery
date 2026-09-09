@@ -32,7 +32,7 @@ enum AuditRelease {
         let packageCheck = await Task.detached { () -> (Bool, String) in
             let process = Process(), output = Pipe()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-            process.arguments = ["Tests/test_public_export.py", "PublicExportTests.test_relay_is_deployable_without_including_local_dependencies"]
+            process.arguments = ["-m", "unittest", "Tests.test_public_export", "Tests.test_installer"]
             process.currentDirectoryURL = exportRoot
             process.environment = ["PATH": "/usr/bin:/bin"]
             process.standardOutput = output; process.standardError = output
@@ -43,7 +43,7 @@ enum AuditRelease {
             let data = output.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
             return (process.terminationStatus == 0, String(decoding: data, as: UTF8.self))
         }.value
-        audit.check("the source archive includes deployable relay code and excludes private local state", packageCheck.0, packageCheck.1)
+        audit.check("source export and installer fixtures preserve release contents, privacy and safe installation", packageCheck.0, packageCheck.1)
         let syntax = plan([], bashOptions: ["-n"])
         audit.check("the script parses", syntax.status == 0 && syntax.output.isEmpty, syntax.output)
         let adHoc = plan(["--plan"], environment: ["ORRERY_AUTO_SIGN": "0"])

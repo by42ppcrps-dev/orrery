@@ -8,6 +8,8 @@
 | Python test caches appeared as code changes | Exclude untracked Python caches on creation and capture; preserve tracked files. |
 | Small secondary targets and cramped composers | Consistent 32-point targets, hover feedback, helpful labels and larger composer insets; hosted target-size checks. |
 | Source archives omitted the repository audit gate | Include the gate configuration and verify its contents and manifest entry; confirmed with a fresh-archive audit. |
+| Building a preview deleted the release waiting for installation | Preserve the recorded release stage while pruning obsolete folders; a real shell-flow fixture builds a preview and then installs the original staged release. |
+| A first installation could report failure after copying the app | Skip backup cleanup when no previous bundle exists; a fresh-destination shell fixture checks the success result and installed contents. |
 
 ## Addressed in 1.10.0
 
