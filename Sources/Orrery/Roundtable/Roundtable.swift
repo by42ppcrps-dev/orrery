@@ -300,7 +300,7 @@ final class Roundtable {
     /// anyone who passed (or failed) but was named in another agent's contribution. An agent
     /// that has not spoken yet is kept.
     static func stillTalking(_ targets: [Provider], entries: [Entry], previousRound: Int) -> [Provider] {
-        let spoken = entries.enumerated().filter { ($0.element.round ?? 0) <= previousRound && $0.element.speaker != "human" }
+        let spoken = entries.enumerated().filter { ($0.element.round) <= previousRound && $0.element.speaker != "human" }
         return targets.filter { provider in
             // The agent's latest word, in any round so far — a skipped round is still a pass.
             guard let own = spoken.last(where: { $0.element.speaker == provider.rawValue }) else { return true }

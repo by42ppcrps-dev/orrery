@@ -47,8 +47,9 @@ needs a very good reason in its description:
 
 ## Style
 
-Swift 6 language mode with strict concurrency; `@MainActor` for UI-facing models, no `@unchecked
-Sendable` without a comment saying why. Prefer data tables over `switch` ladders (see
+Use the Swift 6 toolchain. The packages currently select Swift 5 language mode while concurrency
+migration continues. Use `@MainActor` for UI-facing models and explain why any `@unchecked
+Sendable` type is safe. Prefer data tables over `switch` ladders (see
 `Editor/Language.swift`, `Diagnostics/Checkers.swift`, `LSP/LSPManager.swift`). Comments explain
 why, not what. User-facing text names the real thing that happened ("pyright-langserver is not
 installed") instead of a generic failure.

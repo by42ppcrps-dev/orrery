@@ -62,7 +62,7 @@ final class SimulatorControl: @unchecked Sendable {
     var bringToFront: @Sendable (pid_t) -> Void = { pid in
         // Activation only takes effect from the main thread; touches arrive from background
         // tasks (the pane) and from the tool actor alike, so hop when needed.
-        let activate = { NSRunningApplication(processIdentifier: pid)?.activate(options: []) }
+        let activate: () -> Void = { _ = NSRunningApplication(processIdentifier: pid)?.activate(options: []) }
         if Thread.isMainThread { activate() } else { DispatchQueue.main.sync { activate() } }
         usleep(200_000)
     }

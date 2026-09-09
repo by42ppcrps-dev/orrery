@@ -63,16 +63,16 @@ enum AuditSimulator {
                     tap.map(\.0) == [.mouseMoved, .leftMouseDown, .leftMouseUp] && tap.allSatisfy { $0.2 == 4242 && abs($0.1.x - centre.x) < 0.01 && abs($0.1.y - centre.y) < 0.01 }, tap.map { "\($0.0.rawValue)@\($0.1)" }.description)
         audit.equal("the Simulator app is brought to the front before the touch and Orrery gets focus back after it",
                     focus.log, ["front:4242", "event", "event", "event", "back"])
-        posted.lock.lock(); posted.events = []; posted.lock.unlock()
+        posted.lock.withLock { posted.events = [] }
         control.swipe(screen, from: (589.5, 2000), to: (589.5, 500), duration: 0.05)
         let swipe = posted.events
         audit.check("a swipe is down, a run of drags, then up, ending where the finger lifted",
                     swipe.first?.0 == .leftMouseDown && swipe.last?.0 == .leftMouseUp && swipe.dropFirst().dropLast().allSatisfy { $0.0 == .leftMouseDragged } && swipe.count >= 8
                     && (swipe.last.map { abs($0.1.y - screen.screenPoint(forPixel: 589.5, 500).y) < 0.01 } ?? false), "\(swipe.count) events")
-        posted.lock.lock(); posted.events = []; posted.lock.unlock()
+        posted.lock.withLock { posted.events = [] }
         control.type(screen, text: "hello")
         audit.check("typing posts key down/up pairs to the same app", posted.events.count == 2 && posted.events.allSatisfy { $0.0 == .keyDown || $0.0 == .keyUp } && posted.events.allSatisfy { $0.2 == 4242 })
-        posted.lock.lock(); posted.events = []; posted.lock.unlock()
+        posted.lock.withLock { posted.events = [] }
         try? control.button(screen, name: "home")
         audit.check("Home is the Simulator's ⇧⌘H", posted.events.count == 2 && posted.events.first?.0 == .keyDown)
         audit.check("an unknown button is refused", (try? control.button(screen, name: "volume")) == nil)

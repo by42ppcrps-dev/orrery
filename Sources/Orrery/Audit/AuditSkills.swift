@@ -108,8 +108,8 @@ enum AuditSkills {
                 teamWindow.contentView = teamView; teamWindow.layoutIfNeeded()
                 try? await Task.sleep(for: .milliseconds(100))
                 teamView.layoutSubtreeIfNeeded()
-                func popups(_ view: NSView) -> [NSPopUpButton] {
-                    (view as? NSPopUpButton).map { [$0] } ?? [] + view.subviews.flatMap { popups($0) }
+                @MainActor func popups(_ view: NSView) -> [NSPopUpButton] {
+                    ((view as? NSPopUpButton).map { [$0] } ?? []) + view.subviews.flatMap { popups($0) }
                 }
                 audit.check("the collapsed Team setup mounts the three-agent orchestrator picker", popups(teamView).contains { Set($0.itemTitles) == Set(Provider.allCases.map(\.displayName)) })
                 teamWindow.contentView = nil

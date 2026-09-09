@@ -46,7 +46,7 @@ enum AuditWatchdog {
         tick(0)
         tick(3)
         audit.check("a main thread that answers is never sampled", count.samples == 0 && watchdog.reports.isEmpty)
-        main.lock.lock(); main.responsive = false; main.lock.unlock()
+        main.lock.withLock { main.responsive = false }
         tick(4)   // this ping goes unanswered
         for second in 5...11 { tick(TimeInterval(second)) }
         audit.equal("nothing is sampled in the first 7 s of the hang", count.samples, 0)
@@ -59,7 +59,7 @@ enum AuditWatchdog {
         audit.check("one hang file is written under the log folder", files.count == 1 && files[0].lastPathComponent.hasPrefix("hang-"), files.map(\.lastPathComponent).description)
         audit.check("it says what the app was doing and carries the sample", text.contains("mode Roundtable, running, 42 entries") && text.contains("Call graph") && text.contains("has not answered for 8 s"))
         audit.check("nothing says it recovered yet", !text.contains("answered again"))
-        clock.lock.lock(); clock.now = base.addingTimeInterval(31); clock.lock.unlock()
+        clock.lock.withLock { clock.now = base.addingTimeInterval(31) }
         main.release()
         let after = files.first.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
         audit.check("when the main thread answers, the file gets the hang's length", after.contains("answered again after 27.0 s"), after.suffix(120).description)
@@ -67,10 +67,10 @@ enum AuditWatchdog {
         tick(40)
         tick(41)
         audit.equal("a responsive main thread afterwards is left alone", count.samples, 1)
-        main.lock.lock(); main.responsive = false; main.lock.unlock()
+        main.lock.withLock { main.responsive = false }
         for second in 42...52 { tick(TimeInterval(second)) }
         audit.equal("a second hang gets its own sample", count.samples, 2)
-        clock.lock.lock(); clock.now = base.addingTimeInterval(53); clock.lock.unlock()
+        clock.lock.withLock { clock.now = base.addingTimeInterval(53) }
         main.release()
         let mode = (try? FileManager.default.attributesOfItem(atPath: root.path)[.posixPermissions] as? Int) ?? 0
         audit.check("the log folder is owner-only", mode & 0o777 == 0o700, String(mode, radix: 8))
@@ -86,13 +86,13 @@ enum AuditWatchdog {
         slow.clock = { slowClock.read() }
         let slowBase = slowClock.read()
         slow.tick(now: slowBase)
-        slowMain.lock.lock(); slowMain.responsive = false; slowMain.lock.unlock()
-        slowClock.lock.lock(); slowClock.now = slowBase.addingTimeInterval(2); slowClock.lock.unlock()
+        slowMain.lock.withLock { slowMain.responsive = false }
+        slowClock.lock.withLock { slowClock.now = slowBase.addingTimeInterval(2) }
         slow.tick(now: slowClock.read())     // the unanswered ping
-        slowClock.lock.lock(); slowClock.now = slowBase.addingTimeInterval(11); slowClock.lock.unlock()
+        slowClock.lock.withLock { slowClock.now = slowBase.addingTimeInterval(11) }
         let sampling = Task.detached { slow.tick(now: slowClock.read()) }   // blocks in the sampler until the gate opens
         try? await Task.sleep(nanoseconds: 300_000_000)
-        slowClock.lock.lock(); slowClock.now = slowBase.addingTimeInterval(12); slowClock.lock.unlock()
+        slowClock.lock.withLock { slowClock.now = slowBase.addingTimeInterval(12) }
         slowMain.release()                   // the main thread wakes while the sample is still running
         gate.signal()
         await sampling.value

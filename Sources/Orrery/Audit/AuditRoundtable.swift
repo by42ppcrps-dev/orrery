@@ -359,7 +359,7 @@ enum AuditRoundtable {
             audit.equal("the other agent kept its session", midRunBackends[.codex]?.count, 1)
             audit.check("the first turn still produced its reply", midRun.entries.contains { $0.speaker == "claude" && $0.round == 1 && !$0.failed })
             audit.check("the reply after the change records the new model", midRun.entries.contains { $0.speaker == "claude" && $0.round == 2 && $0.model == "claude-opus-5" },
-                        midRun.entries.filter { $0.speaker == "claude" }.map { "r\($0.round ?? 0):\($0.model ?? "-")" }.joined(separator: " "))
+                        midRun.entries.filter { $0.speaker == "claude" }.map { "r\($0.round):\($0.model ?? "-")" }.joined(separator: " "))
 
             audit.section("Roundtable — you can steer the conversation without stopping it")
             let idleTable = Roundtable()
@@ -399,8 +399,8 @@ enum AuditRoundtable {
             audit.check("it joins the transcript as the user's own message",
                         cappedTable.entries.contains { $0.speaker == "human" && $0.text == "Actually, start with the tests." })
             audit.check("the agents answer it even though the reply rounds were used up",
-                        cappedTable.entries.contains { $0.speaker != "human" && ($0.round ?? 0) >= 2 },
-                        cappedTable.entries.map { "\($0.speaker)/r\($0.round ?? 0)" }.joined(separator: " "))
+                        cappedTable.entries.contains { $0.speaker != "human" && ($0.round) >= 2 },
+                        cappedTable.entries.map { "\($0.speaker)/r\($0.round)" }.joined(separator: " "))
             let steerPrompt = cappedBackends[.claude]?.prompts.last ?? ""
             audit.check("the agent is given the message and told it arrived mid-run",
                         steerPrompt.contains("Actually, start with the tests.") && steerPrompt.contains("just added a message above"), steerPrompt.suffix(160).description)
@@ -429,12 +429,12 @@ enum AuditRoundtable {
                 return backend
             }
             let passingSteered = await runSteered(passingTable, message: "One more thing: check the tests.", storeName: "store-steer-passing") {
-                passingTable.entries.filter { ($0.round ?? 0) == 1 && $0.speaker != "human" }.count == 2 && !passingTable.thinking.isEmpty
+                passingTable.entries.filter { ($0.round) == 1 && $0.speaker != "human" }.count == 2 && !passingTable.thinking.isEmpty
             }
             audit.check("a steer during the round where everyone passes is accepted", passingSteered)
             audit.check("…and the agents come back for another round to answer it",
-                        passingTable.entries.contains { $0.speaker != "human" && ($0.round ?? 0) >= 3 },
-                        passingTable.entries.map { "\($0.speaker)/r\($0.round ?? 0)" }.joined(separator: " "))
+                        passingTable.entries.contains { $0.speaker != "human" && ($0.round) >= 3 },
+                        passingTable.entries.map { "\($0.speaker)/r\($0.round)" }.joined(separator: " "))
             audit.check("the steered round carries the message and says it arrived mid-run",
                         passingBackends[.grok]?.prompts.contains { $0.contains("One more thing: check the tests.") && $0.contains("just added a message above") } == true,
                         (passingBackends[.grok]?.prompts.count ?? 0).description + " prompts")
@@ -455,7 +455,7 @@ enum AuditRoundtable {
                 return backend
             }
             let aloneSteered = await runSteered(aloneTable, message: "Stop and summarise instead.", storeName: "store-steer-alone") { aloneTable.thinking.contains(.codex) }
-            audit.check("a single agent answers a steer too", aloneSteered && aloneTable.entries.contains { $0.speaker == "codex" && ($0.round ?? 0) >= 2 })
+            audit.check("a single agent answers a steer too", aloneSteered && aloneTable.entries.contains { $0.speaker == "codex" && ($0.round) >= 2 })
             audit.check("…with the message in its prompt", (aloneBackend?.prompts.last ?? "").contains("Stop and summarise instead."))
             audit.check("an empty steer is ignored", aloneTable.steer("   ") == false)
             audit.section("Roundtable — the agent you put in charge goes first and runs the plan")
@@ -488,9 +488,9 @@ enum AuditRoundtable {
             audit.check("a table starts with nobody in charge", led.leader == nil)
             await led.send("Codex, you lead: pick a product and give the others their parts.")
             audit.equal("the message puts Codex in charge", led.leader, .codex)
-            let firstRound = led.entries.filter { ($0.round ?? 0) == 1 && $0.speaker != "human" }.map(\.speaker)
+            let firstRound = led.entries.filter { ($0.round) == 1 && $0.speaker != "human" }.map(\.speaker)
             audit.equal("Codex speaks first each round, then the usual order", firstRound, ["codex", "grok", "claude"])
-            let secondRound = led.entries.filter { ($0.round ?? 0) == 2 && $0.speaker != "human" }.map(\.speaker)
+            let secondRound = led.entries.filter { ($0.round) == 2 && $0.speaker != "human" }.map(\.speaker)
             audit.equal("…and again in the reply round", secondRound, ["codex", "grok", "claude"])
             audit.check("Codex is told it leads", (ledBackends[.codex]?.prompts.first ?? "").contains("You lead this roundtable"))
             audit.check("the others are told to follow Codex", (ledBackends[.grok]?.prompts.first ?? "").contains("Codex leads this roundtable")
@@ -622,7 +622,7 @@ enum AuditRoundtable {
             }
             skipTable.attach(project: project, storeDirectory: base.appendingPathComponent("store-skip"))
             await skipTable.send("Ideas?")
-            let byRound = Dictionary(grouping: skipTable.entries.filter { $0.speaker != "human" }, by: { $0.round ?? 0 }).mapValues { $0.map(\.speaker) }
+            let byRound = Dictionary(grouping: skipTable.entries.filter { $0.speaker != "human" }, by: { $0.round }).mapValues { $0.map(\.speaker) }
             audit.equal("round 1 has everyone", byRound[1] ?? [], ["grok", "claude", "codex"])
             audit.equal("round 2 asks only the one who contributed", byRound[2] ?? [], ["claude"])
             audit.equal("round 3 brings back the agent Claude named", byRound[3] ?? [], ["grok", "claude"])

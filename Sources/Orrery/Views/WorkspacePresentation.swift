@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 enum WorkspaceLayout: String, CaseIterable, Identifiable {
     case editor = "Editor", workspace = "Split", assistant = "Assistant"
@@ -29,12 +30,14 @@ struct AssistantPane: View {
                 Spacer(minLength: 0)
                 Button { ActivityWindowSupport.shared.open() } label: { Label("Activity", systemImage: "laptopcomputer.and.iphone") }
                     .buttonStyle(.borderless).font(.caption).help("Follow every open project across your paired Macs")
-                Button("Set up") { model.showSetup = true }.buttonStyle(.borderless).font(.caption).accessibilityLabel("Workspace setup")
+                Button("Set up") { model.showSetup = true }.buttonStyle(.borderless).font(.caption)
+                    .help("Connect your subscriptions or API keys and check project setup")
+                    .accessibilityLabel("Workspace setup")
                 Button {
                     model.requestedSettingsSection = "Connectors"
                     model.showAgentSettings = true
                 } label: { Label("Connections", systemImage: "puzzlepiece.extension") }
-                    .buttonStyle(.borderless).font(.caption)
+                    .buttonStyle(.borderless).font(.caption).help("Manage the tools and plugins available to your agents")
                 PaneIconButton(title: "Agent settings", symbol: "slider.horizontal.3") { model.showAgentSettings = true }
             }
             .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 8)
@@ -102,8 +105,41 @@ struct PaneIconButton: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol).frame(width: 28, height: 28).contentShape(Rectangle())
+            Image(systemName: symbol).frame(width: 20, height: 20)
         }
-        .buttonStyle(.plain).help(title).accessibilityLabel(title)
+        .buttonStyle(StudioActionButtonStyle()).help(title).accessibilityLabel(title)
+    }
+}
+
+/// Secondary actions keep a steady target and highlight without moving nearby content.
+struct StudioActionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        ActionBody(configuration: configuration)
+    }
+
+    private struct ActionBody: View {
+        let configuration: Configuration
+        @Environment(\.isEnabled) private var enabled
+        @State private var hovered = false
+
+        var body: some View {
+            configuration.label
+                .padding(.horizontal, 8).padding(.vertical, 6)
+                .frame(minHeight: 32)
+                .contentShape(RoundedRectangle(cornerRadius: 8))
+                .background(StudioStyle.accent.opacity(enabled && (hovered || configuration.isPressed) ? 0.16 : 0.04),
+                            in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(StudioStyle.border))
+                .opacity(enabled ? 1 : 0.45)
+                .onHover { hovered = $0 }
+        }
+    }
+}
+
+/// A file chooser belongs to the window that opened it, including secondary workspaces.
+@MainActor enum WorkspaceFilePicker {
+    static func present(_ panel: NSOpenPanel, from window: NSWindow?, completion: @escaping (NSApplication.ModalResponse) -> Void) {
+        if let window { panel.beginSheetModal(for: window, completionHandler: completion) }
+        else { panel.begin(completionHandler: completion) }
     }
 }

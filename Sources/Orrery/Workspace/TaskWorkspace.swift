@@ -47,7 +47,11 @@ actor TaskWorkspaceStore {
     static let maximumTotalBytes = 256 * 1_024 * 1_024
     static let maximumFileCount = 20_000
     static let maximumStoredSnapshotBytes = 1_024 * 1_024 * 1_024
-    static let excludedDirectories: Set<String> = ["node_modules", ".build", "build", "dist", "target", ".next", ".cache", ".venv", "venv", "DerivedData", "Pods", "Carthage"]
+    static let excludedDirectories: Set<String> = [
+        "node_modules", ".build", "build", "dist", "target", ".next", ".cache",
+        ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+        "DerivedData", "Pods", "Carthage",
+    ]
 
     struct Failure: LocalizedError {
         var message: String

@@ -76,7 +76,8 @@ struct ChatView: View {
                                         Image(systemName: "arrow.up.left").foregroundStyle(.secondary)
                                     }.padding(10).contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(StudioActionButtonStyle())
+                                .help("Put this suggestion in the message box without sending it")
                                 .background(StudioStyle.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(StudioStyle.border))
                             }
@@ -241,20 +242,29 @@ struct ChatView: View {
 
     private func attach() {
         let panel = NSOpenPanel()
+        panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Attach"
-        guard panel.runModal() == .OK else { return }
+        let project = model.projectURL, provider = model.provider
+        WorkspaceFilePicker.present(panel, from: NSApp.keyWindow) { response in
+            guard response == .OK, !model.isShutDown,
+                  model.projectURL == project, model.provider == provider else { return }
+            attach(panel.urls, to: provider)
+        }
+    }
+
+    private func attach(_ urls: [URL], to provider: Provider) {
         do {
-            guard panel.urls.count + (model.chatAttachments[model.provider]?.count ?? 0) <= 8 else {
+            guard urls.count + (model.chatAttachments[provider]?.count ?? 0) <= 8 else {
                 throw ComputerError("Attach up to 8 files per message.")
             }
-            let attachments = try panel.urls.map { try MessageAttachment(url: $0) }
-            let combined = (model.chatAttachments[model.provider] ?? []) + attachments
+            let attachments = try urls.map { try MessageAttachment(url: $0) }
+            let combined = (model.chatAttachments[provider] ?? []) + attachments
             guard combined.count <= 8, combined.reduce(0, { $0 + $1.data.count }) <= MessageAttachment.limit else {
                 throw ComputerError("Attach up to 8 files, with a combined size of 8 MB.")
             }
-            model.chatAttachments[model.provider] = combined
+            model.chatAttachments[provider] = combined
         } catch { attachmentError = error.localizedDescription }
     }
 

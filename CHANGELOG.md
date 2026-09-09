@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.1 (build 41) — 2026-09-09
+
+- Give pane actions larger click targets and hover feedback, add help to Team and setup actions, and improve Team and Roundtable composer padding.
+- Keep Solo and Team attachment pickers attached to the window that opened them; discard a selection if its project or provider has changed.
+- Exclude untracked Python bytecode and tool caches from working copies and task Changes. Tracked files remain included.
+- Clean up concurrency warnings, scoped locking, redundant optionals and weak editor captures; correct the contributor language-mode guidance.
+- Add regression checks for action size, attachment-window routing and generated Python caches.
+
 ## 1.10.0 (build 40) — 2026-09-09
 
 - Add Activity on Mac, iPhone and iPad: open projects, every Solo agent, Team tasks, Roundtable and native CLI session status across up to eight paired Macs. Search by project, agent or task; filter working items and pending decisions.

@@ -1,5 +1,13 @@
 # Bug ledger
 
+## Addressed in 1.10.1
+
+| Defect | Correction and coverage |
+|---|---|
+| Attaching files in a second workspace could return focus to the first | Window-owned asynchronous pickers; requesting-window and cancel/accept routing checks. |
+| Python test caches appeared as code changes | Exclude untracked Python caches on creation and capture; preserve tracked files. |
+| Small secondary targets and cramped composers | Consistent 32-point targets, hover feedback, helpful labels and larger composer insets; hosted target-size checks. |
+
 ## Addressed in 1.10.0
 
 | Defect | Correction and coverage |

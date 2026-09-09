@@ -6,6 +6,7 @@ import Foundation
 /// at every launch, so a model that shipped this morning is here before any session starts);
 /// then a short known list for aliases the CLIs do not enumerate. Nothing here is a guess
 /// frozen in the source: the known lists only fill gaps.
+@MainActor
 enum ModelCatalog {
     struct Entry: Equatable {
         var option: ModelOption

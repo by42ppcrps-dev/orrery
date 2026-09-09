@@ -21,6 +21,8 @@ enum AuditTaskWorkspaces {
                 try write("script.sh", "#!/bin/sh\nexit 0\n")
                 try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: project.appendingPathComponent("script.sh").path)
                 try write("node_modules/pkg/cache.js", "generated\n")
+                let pythonCaches = ["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]
+                for cache in pythonCaches { try write("package/\(cache)/old.cache", "generated\n") }
                 try Data([0, 1, 2, 0xff]).write(to: project.appendingPathComponent("binary.bin"))
                 let id = UUID()
                 let workspace = try await store.create(taskID: id, project: project)
@@ -28,6 +30,9 @@ enum AuditTaskWorkspaces {
                 audit.equal("task starts with actual preexisting edits", try read("main.swift", root: workspace.executionRoot), "preexisting unsaved-to-git work\n")
                 audit.check("untracked dependencies are excluded", !FileManager.default.fileExists(atPath: workspace.executionRoot.appendingPathComponent("node_modules").path))
                 audit.check("copy exclusions are visible", workspace.notices.contains { $0.contains("node_modules") })
+                audit.check("Python caches are excluded from new working copies", pythonCaches.allSatisfy {
+                    !FileManager.default.fileExists(atPath: workspace.executionRoot.appendingPathComponent("package/\($0)").path)
+                })
                 let privateMode = try FileManager.default.attributesOfItem(atPath: storage.path)[.posixPermissions] as? NSNumber
                 audit.equal("task storage is private", privateMode?.intValue, 0o700)
                 let manifestMode = try FileManager.default.attributesOfItem(atPath: storage.appendingPathComponent(id.uuidString + "/manifest.json").path)[.posixPermissions] as? NSNumber
@@ -40,6 +45,9 @@ enum AuditTaskWorkspaces {
                 try Data([0, 9, 8, 0xff]).write(to: workspace.executionRoot.appendingPathComponent("binary.bin"))
                 try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: workspace.executionRoot.appendingPathComponent("script.sh").path)
                 var changes = try await store.capture(taskID: id)
+                for cache in pythonCaches { try write("package/\(cache)/new.cache", "generated during tests\n", root: workspace.executionRoot) }
+                changes = try await store.capture(taskID: id)
+                audit.check("running Python tools does not add generated cache files to task Changes", !changes.contains { $0.path.contains(".cache") || $0.path.contains("__pycache__") })
                 audit.equal("captures added, modified, removed, binary and mode edits", changes.count, 5)
                 audit.equal("new file has added status", changes.first { $0.path == "new/deep.txt" }?.kind, .added)
                 audit.equal("removed file has deleted status", changes.first { $0.path == "deleted.txt" }?.kind, .deleted)

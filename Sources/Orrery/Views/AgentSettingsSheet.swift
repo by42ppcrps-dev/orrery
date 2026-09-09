@@ -217,7 +217,7 @@ struct AgentSettingsSheet: View {
             }
             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([registry.userURL]) }.disabled(!registry.userFileExists)
         }
-        Text("Languages, language servers, checkers and tasks as JSON; the README’s Registry section documents the format. Loading a registry never runs anything.")
+        Text("Define languages, language servers, checkers and tasks as JSON. Write an example registry to see the supported format. Loading a registry never runs anything.")
             .font(.caption).foregroundStyle(.secondary)
     }
     private var advanced: some View {

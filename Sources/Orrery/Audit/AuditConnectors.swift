@@ -25,7 +25,7 @@ enum AuditConnectors {
             // Let SwiftUI finish its first layout transaction without showing the audit window.
             try? await Task.sleep(for: .milliseconds(100))
             view.layoutSubtreeIfNeeded()
-            func buttonCount(_ view: NSView) -> Int {
+            @MainActor func buttonCount(_ view: NSView) -> Int {
                 (view is NSButton ? 1 : 0) + view.subviews.reduce(0) { $0 + buttonCount($1) }
             }
             let buttons = buttonCount(view)

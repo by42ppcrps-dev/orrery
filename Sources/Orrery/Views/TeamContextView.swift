@@ -8,10 +8,14 @@ struct TeamContextView: View {
     @State private var importing = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
                 Button { showSkills = true } label: { Label("Add skills", systemImage: "sparkles") }
+                    .buttonStyle(StudioActionButtonStyle())
+                    .help("Choose a project or installed skill to share with every Team role")
                 Button { chooseFiles() } label: { Label("Attach files", systemImage: "paperclip") }
+                    .buttonStyle(StudioActionButtonStyle())
+                    .help("Attach up to eight text files, 128 KB total")
                 Menu("Editor context") {
                     Button("Current file") {
                         guard let doc = model.documents.active else { return }
@@ -20,7 +24,8 @@ struct TeamContextView: View {
                     Button("Latest task output") {
                         addText(name: "Latest task output", text: model.taskRun.lines.suffix(300).map(\.text).joined(separator: "\n"))
                     }.disabled(model.taskRun.lines.isEmpty)
-                }.menuStyle(.borderlessButton).fixedSize()
+                }.menuStyle(.borderlessButton).fixedSize().padding(.horizontal, 6).frame(minHeight: 32)
+                    .help("Attach the current editor file or the latest task output")
                 if importing { ProgressView().controlSize(.small) }
                 Spacer(minLength: 0)
             }.controlSize(.small)
@@ -31,8 +36,10 @@ struct TeamContextView: View {
                     Spacer(minLength: 4)
                     Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.data.count), countStyle: .file)).foregroundStyle(.secondary)
                     Button { model.teamAttachments.removeAll { $0.id == attachment.id } } label: { Image(systemName: "xmark") }
-                        .buttonStyle(.plain).accessibilityLabel("Remove \(attachment.name)")
-                }.font(.caption).padding(8).background(StudioStyle.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                        .buttonStyle(StudioActionButtonStyle()).help("Remove \(attachment.name) from this task")
+                        .accessibilityLabel("Remove \(attachment.name)")
+                }.font(.caption).padding(.leading, 12).padding(.trailing, 6).padding(.vertical, 4)
+                    .background(StudioStyle.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
             }
             Text(model.teamAttachments.isEmpty ? "Choose skills or drop text files here. Sent to every Team role when you start." : "\(model.teamAttachments.count) selected · shared with the planner, authors and reviewers.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -52,8 +59,12 @@ struct TeamContextView: View {
         let panel = NSOpenPanel()
         panel.title = "Attach skills or reference files"
         panel.message = "Choose SKILL.md or UTF-8 text files. Up to 8 files and 128 KB total."
-        panel.canChooseDirectories = false; panel.allowsMultipleSelection = true
-        if panel.runModal() == .OK { importFiles(panel.urls) }
+        panel.canChooseFiles = true; panel.canChooseDirectories = false; panel.allowsMultipleSelection = true
+        let project = model.projectURL
+        WorkspaceFilePicker.present(panel, from: NSApp.keyWindow) { response in
+            guard response == .OK, !model.isShutDown, model.projectURL == project else { return }
+            importFiles(panel.urls)
+        }
     }
 
     private func addText(name: String, text: String) {

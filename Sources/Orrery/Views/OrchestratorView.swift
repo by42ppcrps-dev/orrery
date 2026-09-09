@@ -134,7 +134,7 @@ struct OrchestratorView: View {
     // MARK: Setup
 
     private var setup: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Picker("Orchestrator", selection: Bindable(engine).orchestratorProvider) {
                     ForEach(engine.installedProviders) { provider in
@@ -146,6 +146,7 @@ struct OrchestratorView: View {
                 .disabled(engine.isRunning || model.teamPreparing || engine.installedProviders.isEmpty)
                 Spacer(minLength: 0)
                 Button("Agent setup") { model.showSetup = true }.controlSize(.small)
+                    .help("Install or sign in to the agents you want on this team")
             }
             Text(engine.singleProviderTeam ? "One agent, separate author and reviewer models." : "Workers: " + engine.workerPool.map(\.displayName).joined(separator: " & "))
                 .font(.caption).foregroundStyle(.secondary)
@@ -153,6 +154,7 @@ struct OrchestratorView: View {
                 Text("Let the orchestrator plan").tag(false)
                 Text("Use my plan · skip the planner turn").tag(true)
             }.disabled(model.teamPreparing)
+                .help("Let the lead plan, or supply your own plan to save the planning turn")
             if model.teamUseExistingPlan, let author = engine.workerPool.first {
                 Text("Paste a plan from ChatGPT or your own notes below. \(author.displayName) builds; \(engine.reviewer(forAuthor: author)?.displayName ?? "a reviewer") checks the result. Agent work still uses your provider allowance.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -165,9 +167,12 @@ struct OrchestratorView: View {
             Text("What should your team build?").font(.headline)
             TextEditor(text: $model.orchestratorDraft)
                 .font(.body)
+                .scrollContentBackground(.hidden)
                 .frame(minHeight: 100, maxHeight: 150)
+                .padding(10)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
                 .accessibilityLabel("Team task")
-                .overlay(RoundedRectangle(cornerRadius: 6)
+                .overlay(RoundedRectangle(cornerRadius: 10)
                     .stroke(Color.secondary.opacity(0.3)))
                 .overlay(alignment: .topLeading) {
                     if model.orchestratorDraft.isEmpty {
@@ -175,7 +180,7 @@ struct OrchestratorView: View {
                              + "and assigns each to a worker.")
                             .font(.callout)
                             .foregroundStyle(.tertiary)
-                            .padding(6)
+                            .padding(14)
                             .allowsHitTesting(false)
                     }
                 }
@@ -193,6 +198,8 @@ struct OrchestratorView: View {
                     Label(model.teamPreparing ? "Preparing…" : "Start team", systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .help("Start in an isolated working copy, with the selected skills and context")
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(model.orchestratorDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                           || engine.startBlocker != nil || model.projectURL == nil || !model.isProjectTrusted
@@ -273,9 +280,9 @@ struct OrchestratorView: View {
             }
             .font(.callout)
         }
-        .padding(14)
+        .padding(18)
         .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     /// Model and effort per provider, for this run's sessions only — where the money goes.

@@ -2,12 +2,12 @@
 
 Build with Grok, Claude Code and Codex in one native Mac workspace, using your own accounts. Work with one agent, let a Team plan and review changes, or bring agents together in a Roundtable.
 
-**1.10.0 · macOS 14+ · Swift 6 · MIT license**
+**1.10.1 · macOS 14+ · Swift 6 · MIT license**
 
 ## Install
 
 1. Install **Xcode 16 or newer** from the Mac App Store. Open it once to finish setup. In Xcode → Settings → Locations, select its Command Line Tools.
-2. Download **Orrery-1.10.0-source.zip** from the [latest release](https://github.com/by42ppcrps-dev/orrery/releases/latest) and unzip it.
+2. Download **Orrery-1.10.1-source.zip** from the [latest release](https://github.com/by42ppcrps-dev/orrery/releases/latest) and unzip it.
 3. Double-click **Install.command** in the Orrery folder. The first local build takes several minutes and installs the app in Applications. If macOS blocks the downloaded script, review the source and use System Settings → Privacy & Security → Open Anyway, or run `bash Install.command` from that folder in Terminal.
 4. Open Orrery, create a project or open a folder, then choose **Workspace setup**. Install and sign in to one agent to start. Add more whenever you need them.
 

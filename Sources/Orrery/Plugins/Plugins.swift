@@ -399,7 +399,7 @@ extension AppModel {
         var context = PluginRunner.Context(project: projectURL, file: document?.url, languageID: document?.language.id)
         var selectionRange: NSRange?
         var selectedText: String?
-        weak var textView = NSApp.keyWindow?.firstResponder as? CodeTextView
+        let textView = NSApp.keyWindow?.firstResponder as? CodeTextView
         if let document, command.input == .selection || command.input == .buffer {
             let text = document.storage.string as NSString
             var range = document.selection
@@ -412,7 +412,7 @@ extension AppModel {
             editorNote = "\(command.title) needs an open file."; return
         }
         editorNote = "Running \(command.title)…"
-        Task { @MainActor [weak self] in
+        Task { @MainActor [weak self, weak textView] in
             guard let self else { return }
             do {
                 let outcome = try await PluginRunner.run(command.command, arguments: command.arguments, pluginDirectory: reference.directory, context: context)

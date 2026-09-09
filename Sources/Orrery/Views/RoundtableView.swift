@@ -32,6 +32,7 @@ struct RoundtableView: View {
                 Label("Roundtable", systemImage: "person.3").font(.callout.weight(.semibold)).lineLimit(1).fixedSize()
                 Spacer()
                 Button("Clear") { table.clear() }.controlSize(.small).disabled(table.isRunning || (table.entries.isEmpty && table.workspace == nil))
+                    .help("Clear this discussion and start fresh; running work must be stopped first")
             }
             HStack(spacing: 10) {
                 Picker("", selection: Binding(get: { table.mode }, set: { table.mode = $0 })) {
@@ -69,7 +70,7 @@ struct RoundtableView: View {
                 Button("Tool access") {
                     model.requestedSettingsSection = "Computer"
                     model.showAgentSettings = true
-                }.controlSize(.small)
+                }.controlSize(.small).help("Review browser and desktop permissions for this project")
             }
             // The long explanation earns its space only while the table is empty; afterwards the
             // transcript needs the room, and the text lives in the header's help.
@@ -172,6 +173,9 @@ struct RoundtableView: View {
             TextEditor(text: $draft)
                 .font(.system(size: 14)).scrollContentBackground(.hidden)
                 .frame(height: 68).focused($composerFocused)
+                .padding(10)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(StudioStyle.border))
                 .accessibilityLabel("Roundtable message")
             HStack {
                 Text("@ an agent to address them · ⌘↩ to send").font(.caption2).foregroundStyle(.secondary)

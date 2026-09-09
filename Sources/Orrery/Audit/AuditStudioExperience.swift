@@ -3,6 +3,7 @@ import SwiftUI
 
 @MainActor enum AuditStudioExperience {
     static func run(_ audit: Auditor) async {
+        await AuditPresentation.run(audit)
         await onboardingAndUnlock(audit)
         let emptySelection = QuickOpenSelection.shifted(0, by: 1, count: 0)
         audit.check("Down on an empty file search cannot produce a negative selection", emptySelection == 0)

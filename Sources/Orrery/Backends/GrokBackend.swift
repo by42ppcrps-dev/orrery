@@ -79,7 +79,7 @@ final class GrokBackend: AgentBackend {
                                              "writeTextFile": autoApprove],
                                        "terminal": false],
             ])
-            var parameters: [String: Any] = [
+            let parameters: [String: Any] = [
                 "cwd": project.path,
                 "mcpServers": sessionSettings.acpMCPServers + (computerConnection.map { [$0.acp] } ?? []),
                 "_meta": sessionSettings.grokMetadata(autoApprove: autoApprove)
