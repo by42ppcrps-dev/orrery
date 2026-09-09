@@ -7,6 +7,7 @@
 - Exclude untracked Python bytecode and tool caches from working copies and task Changes. Tracked files remain included.
 - Clean up concurrency warnings, scoped locking, redundant optionals and weak editor captures; correct the contributor language-mode guidance.
 - Add regression checks for action size, attachment-window routing and generated Python caches.
+- Include the repository audit gate in source archives so a fresh download retains its Team acceptance checks and passes its own audit.
 
 ## 1.10.0 (build 40) — 2026-09-09
 

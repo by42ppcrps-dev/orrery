@@ -15,7 +15,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-ROOT_FILES = {'Package.swift', 'LICENSE', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'SECURITY.md', 'build-app.sh', 'Install.command'}
+ROOT_FILES = {'Package.swift', 'LICENSE', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'SECURITY.md', 'build-app.sh', 'Install.command', '.orrery-gate.json'}
 TREES = {'Sources', 'Tests', 'Resources', 'Remote', '.github', 'scripts', 'public'}
 SKIP_PARTS = {'.git', '.build', 'build', '.swiftpm', '__pycache__', 'DerivedData', 'xcuserdata', '.DS_Store', 'node_modules', '.wrangler'}
 EXTENSIONS = {'.swift', '.py', '.sh', '.md', '.yml', '.yaml', '.json', '.plist', '.pbxproj', '.xcscheme', '.icns', '.png', '.xcprivacy', '.js', '.toml'}

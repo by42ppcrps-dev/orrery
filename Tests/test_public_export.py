@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -49,6 +50,17 @@ class PublicExportTests(unittest.TestCase):
                 self.assertIn('node_modules/', ignored)
                 self.assertIn('.wrangler/', ignored)
                 self.assertIn('.public-guard-terms', ignored)
+
+    def test_source_archive_retains_the_repository_audit_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); self.fixture(root)
+            gate={'commands': [{'title': 'audit', 'executable': '.build/debug/Orrery', 'arguments': ['--audit']}]}
+            (root/'.orrery-gate.json').write_text(json.dumps(gate))
+            out=root/'result.zip'; module.export(root,out)
+            with zipfile.ZipFile(out) as archive:
+                self.assertEqual(json.loads(archive.read('Orrery/.orrery-gate.json')), gate)
+                manifest=json.loads(archive.read('Orrery/PUBLIC-MANIFEST.json'))
+                self.assertIn('.orrery-gate.json', manifest['files'])
 
     def test_secret_refuses_export_without_printing_value(self):
         with tempfile.TemporaryDirectory() as directory:
