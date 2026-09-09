@@ -29,7 +29,12 @@ import SwiftUI
             @MainActor func segments(in view: NSView) -> [NSSegmentedControl] {
                 ((view as? NSSegmentedControl).map { [$0] } ?? []) + view.subviews.flatMap { segments(in: $0) }
             }
-            let pickerFrame = segments(in: bar).first.map { bar.convert($0.bounds, from: $0) }
+            // AppKit frames can include decoration beyond the visible layout edges.
+            // Compare the native alignment rect so different macOS control styles agree.
+            let pickerFrame = segments(in: bar).first.flatMap { control -> NSRect? in
+                guard let parent = control.superview else { return nil }
+                return bar.convert(control.alignmentRect(forFrame: control.frame), from: parent)
+            }
             audit.check("mode picker has space above and below at \(Int(width))-point pane width",
                         pickerFrame.map { $0.minY >= 10 && bar.bounds.maxY - $0.maxY >= 10 } == true,
                         "picker \(String(describing: pickerFrame)), row \(bar.bounds)")
