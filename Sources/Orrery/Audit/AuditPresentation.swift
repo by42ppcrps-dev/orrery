@@ -15,6 +15,36 @@ import SwiftUI
         audit.check("pane actions remain compact enough for narrow toolbars", size.width <= 44 && size.height <= 44, "\(size)")
         window.contentView = nil
 
+        // Host the shipping rows at narrow and wide pane sizes. A short strip can pass a
+        // screenshot check while clipping controls or leaving no inset above the picker.
+        for width: CGFloat in [420, 620] {
+            let bar = NSHostingView(rootView: AssistantModeBar(provider: .constant(.codex),
+                mode: .constant(.team), showsAgent: false).frame(width: width).fixedSize())
+            window.contentView = bar
+            window.layoutIfNeeded(); bar.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(50))
+            let barHeight = bar.fittingSize.height
+            audit.check("mode controls have breathing room at \(Int(width))-point pane width",
+                        barHeight >= 48 && barHeight <= 64, "height \(barHeight)")
+            @MainActor func segments(in view: NSView) -> [NSSegmentedControl] {
+                ((view as? NSSegmentedControl).map { [$0] } ?? []) + view.subviews.flatMap { segments(in: $0) }
+            }
+            let pickerFrame = segments(in: bar).first.map { bar.convert($0.bounds, from: $0) }
+            audit.check("mode picker has space above and below at \(Int(width))-point pane width",
+                        pickerFrame.map { $0.minY >= 10 && bar.bounds.maxY - $0.maxY >= 10 } == true,
+                        "picker \(String(describing: pickerFrame)), row \(bar.bounds)")
+            window.contentView = nil
+
+            let status = NSHostingView(rootView: ComputerControlStatus {}.frame(width: width).fixedSize())
+            window.contentView = status
+            window.layoutIfNeeded(); status.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(50))
+            let statusHeight = status.fittingSize.height
+            audit.check("computer-control status has room for a usable Stop action at \(Int(width))-point pane width",
+                        statusHeight >= 44 && statusHeight <= 56, "height \(statusHeight)")
+            window.contentView = nil
+        }
+
         // Record the real presenter's dispatch without opening a system dialog during audits.
         final class Panel: NSOpenPanel {
             var recordedWindow: NSWindow?

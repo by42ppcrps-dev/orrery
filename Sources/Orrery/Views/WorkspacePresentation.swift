@@ -41,25 +41,8 @@ struct AssistantPane: View {
                 PaneIconButton(title: "Agent settings", symbol: "slider.horizontal.3") { model.showAgentSettings = true }
             }
             .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 8)
-            HStack(spacing: 10) {
-                if model.showsSoloAgentControls {
-                    Picker("Agent", selection: $model.provider) {
-                        ForEach(Provider.allCases) { provider in
-                            Text(provider.displayName).tag(provider)
-                        }
-                    }
-                    .labelsHidden().frame(width: 110)
-                    .help("Choose the agent for Solo or CLI. Team and Roundtable have their own seats.")
-                }
-                Spacer(minLength: 0)
-                Picker("Assistant mode", selection: $model.assistantMode) {
-                    ForEach(AssistantMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
-                }
-                .labelsHidden().pickerStyle(.segmented).frame(maxWidth: 300)
-                .help("Solo: one agent and one model work on this project. Team: several agents plan, write and review. Roundtable: every agent and you in one thread. CLI: the provider’s own terminal interface.")
-            }
-            .padding(.horizontal, 14).padding(.bottom, 12)
-            .background(.bar)
+            AssistantModeBar(provider: $model.provider, mode: $model.assistantMode,
+                             showsAgent: model.showsSoloAgentControls)
             Divider()
             ToolchainUpdateBanner(watch: ToolchainWatch.shared)
             ForEach(Provider.allCases.filter { model.needsSignIn.contains($0) }) { provider in
@@ -74,13 +57,8 @@ struct AssistantPane: View {
                 .accessibilityElement(children: .combine)
             }
             if model.computerControl?.desktopEnabled == true {
-                HStack(spacing: 6) {
-                    Label("Computer control on", systemImage: "desktopcomputer").font(.caption).foregroundStyle(.secondary)
-                    Text("·").font(.caption).foregroundStyle(.tertiary)
-                    Button("Stop") { model.disableComputerControl() }.buttonStyle(.borderless).font(.caption)
-                        .accessibilityLabel("Stop computer control")
-                    Spacer()
-                }.padding(.horizontal, 12).padding(.vertical, 3)
+                ComputerControlStatus { model.disableComputerControl() }
+                Divider()
                 if model.assistantMode == .cli && model.provider == .grok {
                     Text("The built-in computer tools are available in Grok Chat and Team. This CLI uses its own MCP configuration.")
                         .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, 6)
@@ -95,6 +73,52 @@ struct AssistantPane: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
 
+    }
+}
+
+/// Mode selection keeps its spacing independent of each conversation's content.
+struct AssistantModeBar: View {
+    @Binding var provider: Provider
+    @Binding var mode: AssistantMode
+    let showsAgent: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if showsAgent {
+                Picker("Agent", selection: $provider) {
+                    ForEach(Provider.allCases) { provider in
+                        Text(provider.displayName).tag(provider)
+                    }
+                }
+                .labelsHidden().frame(width: 110)
+                .help("Choose the agent for Solo or CLI. Team and Roundtable have their own seats.")
+            }
+            Spacer(minLength: 0)
+            Picker("Assistant mode", selection: $mode) {
+                ForEach(AssistantMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
+            }
+            .labelsHidden().pickerStyle(.segmented).controlSize(.large).frame(maxWidth: 300)
+            .help("Solo: one agent and one model work on this project. Team: several agents plan, write and review. Roundtable: every agent and you in one thread. CLI: the provider’s own terminal interface.")
+        }
+        .padding(.horizontal, 18).padding(.vertical, 12)
+        .background(.bar)
+    }
+}
+
+struct ComputerControlStatus: View {
+    let stop: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Label("Computer control on", systemImage: "desktopcomputer")
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 12)
+            Button("Stop", action: stop)
+                .font(.caption).buttonStyle(StudioActionButtonStyle())
+                .help("Turn off desktop control for this project")
+                .accessibilityLabel("Stop computer control")
+        }
+        .padding(.horizontal, 18).padding(.vertical, 8)
     }
 }
 

@@ -6,6 +6,7 @@
 |---|---|
 | Attaching files in a second workspace could return focus to the first | Window-owned asynchronous pickers; requesting-window and cancel/accept routing checks. |
 | Python test caches appeared as code changes | Exclude untracked Python caches on creation and capture; preserve tracked files. |
+| Mode selector touched its upper edge and computer-control status was cramped | Balanced selector insets, aligned header margins and a full-height Stop action; actual native layout measured at narrow and wide pane sizes. |
 | Small secondary targets and cramped composers | Consistent 32-point targets, hover feedback, helpful labels and larger composer insets; hosted target-size checks. |
 | Source archives omitted the repository audit gate | Include the gate configuration and verify its contents and manifest entry; confirmed with a fresh-archive audit. |
 | Building a preview deleted the release waiting for installation | Preserve the recorded release stage while pruning obsolete folders; a real shell-flow fixture builds a preview and then installs the original staged release. |

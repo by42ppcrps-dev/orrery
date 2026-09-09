@@ -1,7 +1,8 @@
 # Changelog
 
-## 1.10.1 (build 41) — 2026-09-09
+## 1.10.1 (build 42) — 2026-09-09
 
+- Give the mode selector balanced top and bottom spacing, align header insets, and make the computer-control status a full row with a usable Stop button.
 - Give pane actions larger click targets and hover feedback, add help to Team and setup actions, and improve Team and Roundtable composer padding.
 - Keep Solo and Team attachment pickers attached to the window that opened them; discard a selection if its project or provider has changed.
 - Exclude untracked Python bytecode and tool caches from working copies and task Changes. Tracked files remain included.
