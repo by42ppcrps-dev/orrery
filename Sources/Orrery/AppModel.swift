@@ -713,16 +713,17 @@ final class AppModel {
         return backend
     }
 
-    func startIfNeeded() async {
+    func startIfNeeded(for requested: Provider? = nil) async {
         guard !isShutDown, let projectURL else { return }
+        let provider = requested ?? self.provider
         let requestedProvider = provider
-        guard await restoreTaskWorkspace(for: requestedProvider), requestedProvider == provider, !isShutDown else { return }
+        guard await restoreTaskWorkspace(for: requestedProvider), (requested != nil || requestedProvider == self.provider), !isShutDown else { return }
         guard isProjectTrusted else {
-            update { $0.status = "Restricted project — trust to enable agents" }
+            update(provider) { $0.status = "Restricted project — trust to enable agents" }
             return
         }
         guard installed[provider] == true else {
-            update { $0.status = "\(provider.displayName) CLI not found" }
+            update(provider) { $0.status = "\(provider.displayName) CLI not found" }
             return
         }
         if backends[provider] == nil { backends[provider] = makeBackend(provider) }
@@ -738,7 +739,7 @@ final class AppModel {
         starting.insert(target)
         defer { if generation == sessionGeneration { starting.remove(target) } }
         trimConnectionBookkeeping(for: target)
-        update { $0.status = "Starting…" }
+        update(provider) { $0.status = "Starting…" }
         await backend.start(project: executionRoot(for: target) ?? projectURL, autoApprove: autoApprove)
         if isShutDown || generation != sessionGeneration {
             backend.stop()
@@ -862,8 +863,8 @@ final class AppModel {
     /// A turn can end without any completion event — the CLI is killed, a pipe breaks, a protocol
     /// message is dropped. Without this the window sits on "Working…" with no way out but a new
     /// session, so after a grace period the turn is ended locally.
-    func cancel() {
-        let target = provider
+    func cancel(provider requested: Provider? = nil) {
+        let target = requested ?? provider
         queuePaused.insert(target)
         let cancelToken = UUID()
         cancelTokens[target] = cancelToken
@@ -871,7 +872,7 @@ final class AppModel {
         let cancelledBackend = backends[target]
         cancelPermissions(from: target)
         backends[target]?.cancel()
-        append(.system, "Cancel requested")
+        append(.system, "Cancel requested", to: target)
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(Self.cancelGraceSeconds * 1_000_000_000))
             guard let self, self.sessionGeneration == generation,

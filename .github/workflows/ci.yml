@@ -18,6 +18,14 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_16.4.app 2>/dev/null || sudo xcode-select -s /Applications/Xcode.app
           swift --version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: Remote/OrreryRelay/package-lock.json
+      - name: Relay dependencies and real network tests
+        working-directory: Remote/OrreryRelay
+        run: npm ci && npm test
       - name: Build
         run: swift build
       - name: Headless audit (no provider quota is used)

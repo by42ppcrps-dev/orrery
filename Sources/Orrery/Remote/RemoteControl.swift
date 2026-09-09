@@ -54,7 +54,7 @@ final class RemoteControl {
     private func projectID(for model: AppModel) -> String? { liveProjects.first { $0.model === model }?.id }
 
     static let enabledKey = "remote.enabled.v1"
-    static let maxConnections = 4
+    static let maxConnections = 8
     static let commandsPerSecond = 20
 
     private(set) var devices: [PairedDevice] = []
@@ -217,7 +217,7 @@ final class RemoteControl {
     }
 
     func adoptRelayConnection(_ remote: RemoteConnection) {
-        connections.removeAll { $0.viaRelay }
+        guard connections.count < Self.maxConnections else { remote.close(); return }
         connections.append(remote)
         remote.start()
     }
@@ -244,7 +244,7 @@ final class RemoteControl {
     }
 
     private func refreshConnected() {
-        connectedDevices = connections.compactMap { $0.deviceID }
+        connectedDevices = Array(Set(connections.compactMap { $0.deviceID })).sorted()
     }
 
     // MARK: Pairing
@@ -338,15 +338,27 @@ final class RemoteControl {
     // MARK: The model bridge
 
     /// What a phone sees: the tail of the current conversation and the pending approvals.
-    func snapshot(projectID selectedID: String? = nil) -> RemoteState {
+    static func mode(_ target: String) -> AssistantMode? {
+        switch target.lowercased() {
+        case "solo": return .chat
+        case "team": return .team
+        case "roundtable": return .roundtable
+        case "cli": return .cli
+        default: return nil
+        }
+    }
+
+    func snapshot(projectID selectedID: String? = nil, mode target: String? = nil, provider rawProvider: String? = nil) -> RemoteState {
         let macName = Host.current().localizedName ?? "Mac"
         guard let model = resolvedModel(selectedID) else {
-            return RemoteState(macName: macName, project: nil, mode: "Solo", provider: "", providers: [], isBusy: false, status: selectedID == nil ? "No window" : "Project closed — choose another project", entries: [], permissions: [], projects: projectList, capabilities: ["projects", "command-ack"])
+            return RemoteState(macName: macName, project: nil, mode: "Solo", provider: "", providers: [], isBusy: false, status: selectedID == nil ? "No window" : "Project closed — choose another project", entries: [], permissions: [], projects: projectList, capabilities: ["projects", "command-ack", "activity", "independent-selection"], activities: activityList, activityCount: activityList.count)
         }
+        let mode = target.flatMap(Self.mode) ?? model.assistantMode
+        let provider = rawProvider.flatMap(Provider.init(rawValue:)) ?? model.provider
         var entries: [RemoteState.Entry] = []
         var busy = false
         var status = ""
-        switch model.assistantMode {
+        switch mode {
         case .roundtable:
             busy = model.roundtable.isRunning
             status = model.roundtable.notice ?? (busy ? "Roundtable is running" : "Roundtable")
@@ -355,17 +367,31 @@ final class RemoteControl {
             }
         case .team:
             busy = model.orchestrator.isRunning
-            status = busy ? "Team is running" : "Team"
-            entries = model.orchestrator.log.suffix(40).enumerated().map { RemoteState.Entry(id: "log-\($0.offset)", speaker: "Team", kind: "system", text: $0.element) }
+            status = model.orchestrator.isDemo ? "Demo — no agents are running" : (busy ? "Team is running" : "Team")
+            let team = model.orchestrator
+            let logStart = max(0, team.log.count - 10)
+            entries = team.log.suffix(10).enumerated().map { .init(id: "log-\(logStart + $0.offset)", speaker: "Team", kind: "system", text: $0.element) }
+            let turns = team.items.flatMap { item in item.lane.suffix(5).map { (item.title, $0) } }
+                .sorted { $0.1.at < $1.1.at }.suffix(20)
+            entries += turns.map { title, turn in .init(id: turn.id.uuidString, speaker: turn.provider.displayName + " · " + turn.role,
+                                                        kind: "assistant", text: title + "\n" + turn.text, costUSD: turn.costUSD) }
+            if let live = team.planningLive {
+                entries.append(.init(id: "team-planning-live", speaker: live.provider.displayName + " · orchestrator", kind: "assistant", text: live.text + "\n" + live.tools.suffix(3).joined(separator: "\n")))
+            }
+            for item in team.items where item.live != nil {
+                let live = item.live!
+                entries.append(.init(id: "live-" + item.id.uuidString, speaker: live.provider.displayName + " · " + live.role,
+                                     kind: "assistant", text: item.title + "\n" + live.text + "\n" + live.tools.suffix(3).joined(separator: "\n")))
+            }
         case .cli:
-            busy = model.nativeSessions[model.provider]?.isRunning == true
-            status = "Native CLI is open on the Mac. Phone messages start a separate Solo conversation."
+            busy = model.nativeSessions[provider]?.isRunning == true
+            status = "Native CLI runs on the Mac. Its terminal and provider-owned prompts are available there."
         case .chat:
-            let state = model.states[model.provider] ?? ProviderState()
+            let state = model.states[provider] ?? ProviderState()
             busy = state.isBusy
             status = state.status
             entries = state.entries.suffix(40).map {
-                RemoteState.Entry(id: $0.id, speaker: $0.kind == .user ? "You" : model.provider.displayName, kind: $0.kind.rawValue,
+                RemoteState.Entry(id: $0.id, speaker: $0.kind == .user ? "You" : provider.displayName, kind: $0.kind.rawValue,
                                   text: $0.kind == .tool ? ($0.title.isEmpty ? "Tool" : $0.title) : $0.text)
             }
         }
@@ -374,19 +400,67 @@ final class RemoteControl {
                                    title: request.title, detail: String(request.detail.prefix(4000)),
                                    options: request.options.map { RemoteState.Permission.Option(id: $0.id, name: $0.name, kind: $0.kind) })
         }
-        return RemoteState(macName: macName, project: model.projectURL?.lastPathComponent, mode: model.assistantMode.rawValue,
-                           provider: model.provider.rawValue, providers: Provider.allCases.filter { model.installed[$0] == true }.map(\.rawValue),
+        return RemoteState(macName: macName, project: model.projectURL?.lastPathComponent, mode: mode.rawValue,
+                           provider: provider.rawValue, providers: Provider.allCases.filter { model.installed[$0] == true }.map(\.rawValue),
                            isBusy: busy, status: status,
                            entries: entries.map { var entry = $0; entry.text = String(entry.text.prefix(12_000)); return entry },
                            permissions: Array(permissions.prefix(20)), projectID: projectID(for: model), projects: projectList,
-                           capabilities: ["projects", "command-ack"])
+                           capabilities: ["projects", "command-ack", "activity", "independent-selection"], activities: activityList, activityCount: activityList.count)
     }
 
     private var projectList: [RemoteState.Project] {
         liveProjects.map { reference in
             let model = reference.model!
             return .init(id: reference.id, name: model.projectURL?.lastPathComponent ?? "Project",
-                         isBusy: model.roundtable.isRunning || model.orchestrator.isRunning || model.states.values.contains(where: \.isBusy))
+                         isBusy: model.roundtable.isRunning || model.orchestrator.isRunning || model.states.values.contains(where: \.isBusy) || model.nativeSessions.values.contains(where: \.isRunning))
+        }
+    }
+
+    var activityList: [RemoteState.Activity] {
+        var rows: [RemoteState.Activity] = []
+        for reference in liveProjects {
+            guard let model = reference.model else { continue }
+            let project = model.projectURL?.lastPathComponent ?? "Project"
+            let approvals = model.permissionQueue.count
+            func row(_ id: String, _ mode: String, _ provider: String, _ title: String, _ status: String, _ busy: Bool, _ waiting: Int = 0) {
+                rows.append(.init(id: reference.id + ":" + id, projectID: reference.id, project: project, mode: mode,
+                                  provider: provider, title: title, status: status, isBusy: busy, approvalCount: waiting))
+            }
+            for provider in Provider.allCases where model.installed[provider] == true || !(model.states[provider]?.entries.isEmpty ?? true) {
+                let state = model.states[provider] ?? ProviderState()
+                let waiting = model.permissionQueue.filter { model.permissionProvider(for: $0.id) == provider }.count
+                row("solo-" + provider.rawValue, "solo", provider.rawValue, provider.displayName,
+                    state.status, state.isBusy || model.starting.contains(provider), waiting)
+            }
+            let team = model.orchestrator
+            let teamStatus: String
+            switch team.phase {
+            case .idle: teamStatus = "Ready"
+            case .planning: teamStatus = "Planning"
+            case .working: teamStatus = "Working on \(team.items.count) tasks"
+            case .done: teamStatus = "Finished"
+            case .cancelled: teamStatus = "Stopped"
+            case .failed(let reason): teamStatus = String(reason.prefix(500))
+            }
+            row("team", "team", team.orchestratorProvider.rawValue, team.isDemo ? "Demo: Team" : "Team", team.isDemo ? "Demo — no agents are running" : teamStatus, !team.isDemo && (team.isRunning || model.teamPreparing), approvals)
+            for item in team.items {
+                let live = item.live
+                row("team-" + item.id.uuidString, "team", (live?.provider ?? item.author).rawValue,
+                    (team.isDemo ? "Demo: " : "") + item.title, live.map { "\($0.provider.displayName) · \($0.role)" } ?? item.state.rawValue.replacingOccurrences(of: "acceptedWithObjections", with: "Accepted with objections").replacingOccurrences(of: "notConverging", with: "Needs attention").capitalized, live != nil && team.isRunning && !team.isDemo)
+            }
+            row("roundtable", "roundtable", "", "Roundtable", model.roundtable.notice ?? (model.roundtable.isRunning ? "Discussing" : "Ready"), model.roundtable.isRunning, approvals)
+            for provider in Provider.allCases {
+                if let session = model.nativeSessions[provider] {
+                    row("cli-" + provider.rawValue, "cli", provider.rawValue, provider.displayName + " CLI",
+                        session.isRunning ? "Terminal session open on the Mac" : "Terminal session stopped", session.isRunning)
+                }
+            }
+        }
+        // Waiting decisions and live work remain visible when transport limits trim the list.
+        return rows.sorted {
+            if ($0.approvalCount > 0) != ($1.approvalCount > 0) { return $0.approvalCount > 0 }
+            if $0.isBusy != $1.isBusy { return $0.isBusy }
+            return ($0.project.localizedStandardCompare($1.project) == .orderedAscending) || ($0.project == $1.project && $0.id < $1.id)
         }
     }
 
@@ -397,18 +471,8 @@ final class RemoteControl {
         switch command.kind {
         case .ping: return nil
         case .state:
-            if let target = command.target {
-                switch target {
-                case "solo": model.assistantMode = .chat
-                case "team": model.assistantMode = .team
-                case "roundtable": model.assistantMode = .roundtable
-                default: return "Unknown conversation mode."
-                }
-            }
-            if let raw = command.provider {
-                guard let provider = Provider(rawValue: raw), model.installed[provider] == true else { return "That agent is not installed on the Mac." }
-                model.provider = provider
-            }
+            if let target = command.target, Self.mode(target) == nil { return "Unknown conversation mode." }
+            if let raw = command.provider, Provider(rawValue: raw) == nil { return "Unknown agent." }
             return nil
         case .send:
             let text = (command.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -418,7 +482,6 @@ final class RemoteControl {
             guard !model.taskMutationBusy else { return "The project is preparing a working copy. Try again shortly." }
             guard model.isProjectTrusted else { return "Trust the project on the Mac first." }
             if command.target == "roundtable" || (command.target == nil && model.assistantMode == .roundtable) {
-                model.assistantMode = .roundtable
                 // While a run is going the phone steers it instead of being refused.
                 if !model.roundtable.steer(text) {
                     let key = projectID(for: model) ?? "default"
@@ -440,20 +503,15 @@ final class RemoteControl {
                 }
             } else if command.target == "team" || (command.target == nil && model.assistantMode == .team) {
                 guard !model.orchestrator.isRunning, !model.teamPreparing else { return "The team is working. Stop it before starting another task." }
-                model.assistantMode = .team
                 let previousTask = model.teamTaskID
                 model.orchestratorDraft = text
                 await model.startTeamTask()
                 if model.teamTaskID == previousTask, !model.orchestrator.isRunning { return model.taskNotice ?? "The team could not start." }
             } else {
-                if let raw = command.provider {
-                    guard let provider = Provider(rawValue: raw), model.installed[provider] == true else { return "That agent is not installed on the Mac." }
-                    model.provider = provider
-                }
-                guard model.installed[model.provider] == true else { return "Install this agent on the Mac first." }
-                guard !model.starting.contains(model.provider), !model.taskPreparing.contains(model.provider) else { return "The agent is connecting. Try again shortly." }
-                model.assistantMode = .chat
-                let provider = model.provider
+                let provider = command.provider.flatMap(Provider.init(rawValue:)) ?? model.provider
+                if let raw = command.provider, Provider(rawValue: raw) == nil { return "Unknown agent." }
+                guard model.installed[provider] == true else { return "Install this agent on the Mac first." }
+                guard !model.starting.contains(provider), !model.taskPreparing.contains(provider) else { return "The agent is connecting. Try again shortly." }
                 if model.states[provider]?.isBusy == true {
                     guard (model.taskQueues[provider]?.count ?? 0) < 12 else { return "The queue is full (12 messages). Your draft has been kept." }
                     model.enqueuePrompt(text, attachments: [], for: provider)
@@ -467,8 +525,8 @@ final class RemoteControl {
                 Task { [weak self, weak model] in
                     defer { self?.scheduledSends.remove(key) }
                     guard let model, !model.isShutDown else { return }
-                    await model.startIfNeeded()
-                    guard !model.isShutDown, model.provider == provider, !model.starting.contains(provider) else { return }
+                    await model.startIfNeeded(for: provider)
+                    guard !model.isShutDown, !model.starting.contains(provider) else { return }
                     await model.sendToProvider(text, target: provider)
                 }
                 // Delivery is confirmed when accepted, without waiting for the AI's whole answer.
@@ -490,11 +548,14 @@ final class RemoteControl {
             request.reply(choice)
             return nil
         case .stop:
-            switch model.assistantMode {
+            if let target = command.target, Self.mode(target) == nil { return "Unknown conversation mode." }
+            if let raw = command.provider, Provider(rawValue: raw) == nil { return "Unknown agent." }
+            let provider = command.provider.flatMap(Provider.init(rawValue:)) ?? model.provider
+            switch command.target.flatMap(Self.mode) ?? model.assistantMode {
             case .roundtable: model.roundtable.stop()
             case .team: model.orchestrator.stop()
-            case .cli: model.nativeSessions[model.provider]?.terminate()
-            case .chat: model.cancel()
+            case .cli: model.nativeSessions[provider]?.terminate()
+            case .chat: model.cancel(provider: provider)
             }
             return nil
         }
@@ -507,7 +568,7 @@ final class RemoteControl {
         pushTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 150_000_000)
             guard !Task.isCancelled, let self else { return }
-            for connection in self.connections where connection.isAuthenticated { connection.push(self.snapshot(projectID: connection.selectedProjectID)) }
+            for connection in self.connections where connection.isAuthenticated { connection.push(connection.snapshot()) }
         }
     }
 }
@@ -519,7 +580,10 @@ private extension String {
 /// One phone connection: clear-text handshake, then sealed frames both ways.
 @MainActor
 final class RemoteConnection {
-    private let connection: NWConnection
+    private let connection: NWConnection?
+    private var relaySend: ((Data, (() -> Void)?) -> Void)?
+    private var relayClose: (() -> Void)?
+    private var closed = false
     private weak var control: RemoteControl?
     private(set) var deviceID: String?
     private var sealer: RemoteSealer?
@@ -527,6 +591,11 @@ final class RemoteConnection {
     private var seenCommandIDs: [String] = []
     private var handshakeTimeout: Task<Void, Never>?
     private(set) var selectedProjectID: String?
+    private var selectedMode: String?
+    private var selectedProvider: String?
+    func snapshot() -> RemoteState {
+        control!.snapshot(projectID: selectedProjectID, mode: selectedMode, provider: selectedProvider)
+    }
     var isAuthenticated: Bool { sealer != nil && deviceID != nil }
     /// True for the Mac's own socket to the relay: it idles until a phone arrives, so it gets no
     /// handshake deadline, and its state is reported to the relay link.
@@ -539,12 +608,18 @@ final class RemoteConnection {
         self.viaRelay = viaRelay
     }
 
+    init(control: RemoteControl, send: @escaping (Data, (() -> Void)?) -> Void, close: @escaping () -> Void) {
+        self.connection = nil; self.control = control; self.viaRelay = true
+        self.relaySend = send; self.relayClose = close
+    }
+
     func start() {
-        if !viaRelay { handshakeTimeout = Task { [weak self] in
+        if !viaRelay || connection == nil { handshakeTimeout = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 15_000_000_000)
             guard !Task.isCancelled, let self, !self.isAuthenticated else { return }
             self.close()
         } }
+        guard let connection else { return }
         connection.stateUpdateHandler = { [weak self] state in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -561,12 +636,16 @@ final class RemoteConnection {
     }
 
     func close() {
+        guard !closed else { return }; closed = true
         handshakeTimeout?.cancel()
         sealer = nil; deviceID = nil
-        connection.cancel()
+        connection?.cancel()
+        let finish = relayClose; relayClose = nil; relaySend = nil
+        control?.connectionClosed(self); finish?()
     }
 
     private func receive() {
+        guard !closed, let connection else { return }
         connection.receiveMessage { [weak self] data, context, complete, error in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -579,6 +658,9 @@ final class RemoteConnection {
     }
 
     private func send(_ envelope: RemoteEnvelope, then completion: (() -> Void)? = nil) {
+        guard !closed else { return }
+        if let relaySend { relaySend(envelope.encoded(), completion); return }
+        guard let connection else { return }
         let metadata = NWProtocolWebSocket.Metadata(opcode: .binary)
         let context = NWConnection.ContentContext(identifier: "orrery", metadata: [metadata])
         connection.send(content: envelope.encoded(), contentContext: context, isComplete: true, completion: .contentProcessed { _ in
@@ -596,7 +678,8 @@ final class RemoteConnection {
         send(RemoteEnvelope(type: "frame", sealed: frame))
     }
 
-    private func handle(_ data: Data) {
+    fileprivate func handle(_ data: Data) {
+        guard !closed else { return }
         guard data.count <= RemoteProtocol.maxFrameBytes * 2, let envelope = RemoteEnvelope.decode(data), let control else { fail("Malformed message."); return }
         switch envelope.type {
         case "pair":
@@ -622,7 +705,9 @@ final class RemoteConnection {
             guard let welcome = try? sealer.seal(RemotePayload(state: control.snapshot().boundedForTransport()).encoded()) else { fail("Sealing failed."); return }
             self.sealer = sealer
             handshakeTimeout?.cancel()
-            selectedProjectID = control.snapshot().projectID
+            let initial = control.snapshot()
+            selectedProjectID = initial.projectID
+            selectedMode = initial.mode.lowercased(); selectedProvider = initial.provider
             deviceID = id
             control.touch(id)
             send(RemoteEnvelope(type: "welcome", ephemeral: localEphemeral.publicKey.rawRepresentation, nonce: serverNonce, sealed: welcome))
@@ -644,14 +729,22 @@ final class RemoteConnection {
                 }
                 var scoped = command
                 if scoped.projectID == nil { scoped.projectID = self.selectedProjectID }
+                if scoped.kind == .send || scoped.kind == .stop {
+                    if scoped.target == nil { scoped.target = self.selectedMode }
+                    if scoped.provider == nil { scoped.provider = self.selectedProvider }
+                }
                 let error: String?
                 if command.kind == .state, let id = command.projectID, !control.projectExists(id) {
                     error = "That project is no longer open."
                 } else {
-                    if command.kind == .state, let id = command.projectID { self.selectedProjectID = id }
                     error = await control.perform(scoped)
+                    if command.kind == .state, error == nil {
+                        if let id = command.projectID { self.selectedProjectID = id }
+                        if let mode = command.target { self.selectedMode = mode }
+                        if let provider = command.provider { self.selectedProvider = provider }
+                    }
                 }
-                let payload = RemotePayload(state: control.snapshot(projectID: self.selectedProjectID).boundedForTransport(), error: error,
+                let payload = RemotePayload(state: self.snapshot().boundedForTransport(), error: error,
                                             acknowledgedCommandID: command.id)
                 if let sealer = self.sealer, let frame = try? sealer.seal(payload.encoded()) { self.send(RemoteEnvelope(type: "frame", sealed: frame)) }
             }
@@ -662,57 +755,125 @@ final class RemoteConnection {
 }
 
 
-/// The Mac's outbound WebSocket to its room at the relay, reconnecting with backoff while remote
-/// control stays on. Each connection is an ordinary `RemoteConnection`, so everything the phone
-/// does through the relay goes through the same handshake and the same sealed frames.
+/// One outbound socket, one independent encrypted RemoteConnection per relay channel.
+/// Older relays remain usable with a single viewer until their owner updates the Worker.
 @MainActor
 final class RelayLink {
     private let url: URL
     private weak var control: RemoteControl?
+    private var connection: NWConnection?
+    private var channels: [String: RemoteConnection] = [:]
+    private var legacy: RemoteConnection?
+    private var multiplexed = false
     private var attempt = 0
     private var reconnect: Task<Void, Never>?
+    private var deadline: Task<Void, Never>?
     private var stopped = false
     private(set) var connectionsMade = 0
 
     init(url: URL, control: RemoteControl) {
-        self.url = url
-        self.control = control
+        var address = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        address.queryItems = (address.queryItems ?? []) + [URLQueryItem(name: "protocol", value: "2")]
+        self.url = address.url!; self.control = control
     }
-
     func connect() {
         guard !stopped, let control else { return }
-        let parameters = NWParameters.tls
-        let websocket = NWProtocolWebSocket.Options()
-        websocket.autoReplyPing = true
-        websocket.maximumMessageSize = RemoteProtocol.maxFrameBytes * 2
-        let plain = url.scheme?.lowercased() == "ws"
-        let base: NWParameters = plain ? .tcp : .tls
+        disconnect()
+        let base: NWParameters = url.scheme == "ws" ? .tcp : .tls
+        let websocket = NWProtocolWebSocket.Options(); websocket.autoReplyPing = true
+        websocket.maximumMessageSize = RelayPacket.maxBytes
         base.defaultProtocolStack.applicationProtocols.insert(websocket, at: 0)
-        _ = parameters
         let connection = NWConnection(to: .url(url), using: base)
-        let remote = RemoteConnection(connection: connection, control: control, viaRelay: true)
-        connectionsMade += 1
+        self.connection = connection; connectionsMade += 1
         control.relayLinkChanged("connecting")
-        remote.onState = { [weak self, weak remote] state in
-            guard let self, let control = self.control else { return }
-            switch state {
-            case .ready:
-                self.attempt = 0
-                control.relayLinkChanged(remote?.isAuthenticated == true ? "phone connected" : "waiting for the phone")
-            case let .waiting(error):
-                control.relayLinkChanged("waiting: \(error.localizedDescription)")
-            case .failed, .cancelled:
-                self.scheduleReconnect()
-            default: break
+        connection.stateUpdateHandler = { [weak self, weak connection] state in
+            MainActor.assumeIsolated {
+                guard let self, let connection, self.connection === connection else { return }
+                switch state {
+                case .ready:
+                    self.attempt = 0; self.deadline?.cancel()
+                    self.control?.relayLinkChanged("waiting for the phone")
+                case .failed, .cancelled: self.scheduleReconnect()
+                default: break
+                }
             }
         }
-        control.adoptRelayConnection(remote)
+        deadline = Task { [weak self, weak connection] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard !Task.isCancelled, let self, let connection, self.connection === connection else { return }
+            self.scheduleReconnect()
+        }
+        connection.start(queue: .main); receive(connection)
     }
-
-    /// Backoff 1, 2, 4 … 30 s. A dropped socket is normal: the relay closes it when the phone leaves.
+    private func receive(_ connection: NWConnection) {
+        connection.receiveMessage { [weak self, weak connection] data, context, complete, error in
+            MainActor.assumeIsolated {
+                guard let self, let connection, self.connection === connection else { return }
+                let opcode = (context?.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata)?.opcode
+                if error != nil || opcode == .close || (complete && data == nil && context == nil) { self.scheduleReconnect(); return }
+                if let data, !data.isEmpty { self.handle(data) }
+                if self.connection === connection { self.receive(connection) }
+            }
+        }
+    }
+    private func handle(_ data: Data) {
+        guard let control else { return }
+        if let packet = RelayPacket.decode(data) {
+            switch packet.type {
+            case "relay.ready":
+                guard legacy == nil, !multiplexed else { scheduleReconnect(); return }
+                multiplexed = true
+            case "relay.open":
+                guard multiplexed, let id = packet.id, channels[id] == nil else { scheduleReconnect(); return }
+                guard channels.count < RemoteControl.maxConnections else { send(RelayPacket(type: "relay.close", id: id).encoded()); return }
+                let remote = RemoteConnection(control: control, send: { [weak self] data, completion in
+                    guard let self else { return }
+                    self.send(RelayPacket(type: "relay.data", id: id, data: String(decoding: data, as: UTF8.self)).encoded(), then: completion)
+                }, close: { [weak self] in
+                    guard let self, self.channels.removeValue(forKey: id) != nil else { return }
+                    self.send(RelayPacket(type: "relay.close", id: id).encoded())
+                })
+                channels[id] = remote; control.adoptRelayConnection(remote)
+            case "relay.data":
+                guard multiplexed, let id = packet.id, let body = packet.data else { scheduleReconnect(); return }
+                channels[id]?.handle(Data(body.utf8))
+            case "relay.close":
+                guard multiplexed, let id = packet.id else { scheduleReconnect(); return }
+                channels.removeValue(forKey: id)?.close()
+            default: break
+            }
+        } else if !multiplexed, RemoteEnvelope.decode(data) != nil {
+            if legacy == nil {
+                let remote = RemoteConnection(control: control, send: { [weak self] data, completion in self?.send(data, then: completion) },
+                    close: { [weak self] in self?.scheduleReconnect() })
+                legacy = remote; control.adoptRelayConnection(remote)
+            }
+            legacy?.handle(data)
+        } else { scheduleReconnect() }
+    }
+    private func send(_ data: Data, then completion: (() -> Void)? = nil) {
+        guard let connection, data.count <= RelayPacket.maxBytes else { return }
+        let metadata = NWProtocolWebSocket.Metadata(opcode: .binary)
+        connection.send(content: data, contentContext: .init(identifier: "relay", metadata: [metadata]), isComplete: true,
+            completion: .contentProcessed { [weak self, weak connection] error in
+                DispatchQueue.main.async {
+                    guard let self, let connection, self.connection === connection else { return }
+                    if error != nil { self.scheduleReconnect() } else { completion?() }
+                }
+            })
+    }
+    private func disconnect() {
+        deadline?.cancel()
+        let previous = connection; connection = nil; previous?.cancel()
+        let sessions = Array(channels.values); channels.removeAll()
+        let oldLegacy = legacy; legacy = nil
+        // Clear transports before closing sessions so callbacks cannot reconnect recursively.
+        for session in sessions { session.close() }
+        oldLegacy?.close(); multiplexed = false
+    }
     private func scheduleReconnect() {
-        guard !stopped else { return }
-        control?.relayLinkChanged("reconnecting")
+        guard !stopped, connection != nil else { return }
+        disconnect(); control?.relayLinkChanged("reconnecting")
         attempt += 1
         let delay = min(30.0, pow(2.0, Double(attempt - 1)))
         reconnect?.cancel()
@@ -722,9 +883,5 @@ final class RelayLink {
             self.connect()
         }
     }
-
-    func stop() {
-        stopped = true
-        reconnect?.cancel(); reconnect = nil
-    }
+    func stop() { stopped = true; reconnect?.cancel(); reconnect = nil; disconnect() }
 }

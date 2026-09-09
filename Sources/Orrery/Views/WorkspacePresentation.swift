@@ -27,6 +27,8 @@ struct AssistantPane: View {
             HStack(spacing: 10) {
                 HStack(spacing: 9) { OrbitMark(size: 27); Text("Workspace").font(.headline) }
                 Spacer(minLength: 0)
+                Button { ActivityWindowSupport.shared.open() } label: { Label("Activity", systemImage: "laptopcomputer.and.iphone") }
+                    .buttonStyle(.borderless).font(.caption).help("Follow every open project across your paired Macs")
                 Button("Set up") { model.showSetup = true }.buttonStyle(.borderless).font(.caption).accessibilityLabel("Workspace setup")
                 Button {
                     model.requestedSettingsSection = "Connectors"

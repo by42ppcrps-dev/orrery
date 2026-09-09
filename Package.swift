@@ -10,7 +10,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Orrery",
-            dependencies: [.product(name: "OrreryRemoteProtocol", package: "OrreryRemoteProtocol")],
+            dependencies: [.product(name: "OrreryRemoteProtocol", package: "OrreryRemoteProtocol"), .product(name: "OrreryRemoteClient", package: "OrreryRemoteProtocol")],
             path: "Sources/Orrery",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),

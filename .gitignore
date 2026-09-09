@@ -21,5 +21,5 @@ __pycache__/
 *.provisionprofile
 
 # Cloudflare Worker local state
-Remote/OrreryRelay/.wrangler/
+.wrangler/
 Remote/OrreryRelay/node_modules/

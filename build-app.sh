@@ -18,8 +18,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NAME="Orrery"
 IDENTIFIER="app.orrery.studio"
-VERSION="1.9.0"
-BUILD="37"
+VERSION="1.10.0"
+BUILD="38"
 MODE="build"
 PLAN=0
 for argument in "$@"; do

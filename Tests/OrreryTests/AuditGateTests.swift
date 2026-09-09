@@ -23,8 +23,10 @@ final class AuditGateTests: XCTestCase {
         let text = String(data: pipe.fileHandleForReading.readDataToEndOfFile(),
                           encoding: .utf8) ?? ""
         process.waitUntilExit()
+        let failures = text.split(separator: "\n").filter { $0.hasPrefix("FAIL  ") }
+            .joined(separator: "\n")
         XCTAssertEqual(process.terminationStatus, 0,
-                       "Orrery --audit failed:\n\(text.suffix(4000))")
+                       "Orrery --audit failed:\n\(failures)\n\(text.suffix(4000))")
     }
 
     private static var packageRoot: URL {

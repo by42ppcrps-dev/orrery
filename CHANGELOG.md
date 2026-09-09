@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.10.0 (build 38) — 2026-09-09
+
+- Add Activity on Mac, iPhone and iPad: open projects, every Solo agent, Team tasks, Roundtable and native CLI session status across up to eight paired Macs. Search by project, agent or task; filter working items and pending decisions.
+- Keep each viewer's project, mode and agent independent of the host Mac and other viewers. Block controls until the destination is confirmed, and route Stop to that destination.
+- Keep offline snapshots visibly stale, reconnect each host independently, and preserve unsent drafts per project, mode and provider while the app is running.
+- Share the remote client between platforms. Store all pairings and relay credentials in Keychain, migrating the previous phone pairing only after a successful secure write.
+- Relay 2 supports up to eight viewers per Mac with separate encrypted sessions, bounded routing, targeted revocation and safe Mac replacement. Older relays remain usable with one viewer; owners must update their Worker for multiple viewers.
+- Include the relay code, tests and deployment configuration in source archives; exclude local dependencies and relay state. Pin relay development tools and resolve the vulnerable image-processing dependency.
+- Orrery Remote 1.3 (4) uses the shared dashboard. The public release remains source-only; iOS signing and optional relay deployment belong to each user.
+
 ## 1.9.0 (build 37) — 2026-09-08
 
 - Team keeps the orchestrator selector visible and removes unrelated Solo provider/model controls from Team and Roundtable.

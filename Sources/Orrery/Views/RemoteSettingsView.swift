@@ -7,24 +7,32 @@ import OrreryRemoteProtocol
 struct RemoteSettingsView: View {
     @Bindable var model: AppModel
     @State private var now = Date()
+    @State private var relayDraft = ""
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var remote: RemoteControl { model.remote }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Remote control").font(.headline)
-            Text("Control this Mac's Orrery from your iPhone with the Orrery Remote app: switch open projects, read conversations, send messages, approve or deny tool requests and stop work. Off by default. Everything travels sealed between the two devices with keys made at pairing; nothing goes through a server of ours. Same Wi‑Fi, or a VPN such as Tailscale when you are away.")
+            HStack {
+                Text("Remote control").font(.headline)
+                Spacer()
+                Button("Activity Across Devices…") { ActivityWindowSupport.shared.open() }
+            }
+            Text("Follow this Mac from your other Macs, iPhone or iPad. Paired devices can read open projects, send messages, answer decisions and stop work. Connections are encrypted. Use the same Wi-Fi, your VPN or a relay you host. Remote control is off by default.")
                 .font(.callout).foregroundStyle(.secondary)
             Toggle("Allow control from paired devices", isOn: Binding(get: { remote.enabled }, set: { remote.enabled = $0 }))
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Relay").font(.callout.weight(.semibold))
-                    TextField("https://orrery-relay.<you>.workers.dev (leave empty for LAN or VPN only)", text: Binding(get: { remote.relayURL }, set: { remote.relayURL = $0.trimmingCharacters(in: .whitespaces) }))
+                    TextField("https://orrery-relay.<you>.workers.dev (leave empty for LAN or VPN only)", text: $relayDraft)
                         .textFieldStyle(.roundedBorder)
+                        .onSubmit { remote.relayURL = relayDraft.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    Button("Apply") { remote.relayURL = relayDraft.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .disabled(relayDraft.trimmingCharacters(in: .whitespacesAndNewlines) == remote.relayURL)
                     if !remote.relayURL.isEmpty { Text(remote.relayPhoneConnected ? "phone connected" : remote.relayStatus).font(.caption).foregroundStyle(.secondary) }
                 }
-                Text("A relay lets the phone reach this Mac from any network. Deploy Remote/OrreryRelay to your own Cloudflare account (npx wrangler deploy), paste its URL here, then pair the phone again so its code carries the room. Frames stay sealed end to end; the relay only checks the room token.")
+                Text("A relay connects devices across networks. Follow the Relay setup guide included with Orrery, apply its address here, then pair devices. Update an existing relay to support multiple viewers. Your own hosting charges may apply.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if remote.enabled {
@@ -59,6 +67,7 @@ struct RemoteSettingsView: View {
             Text("A paired phone can do exactly what this window can: send, approve, stop. It cannot enable computer control, change the approval rules or edit settings. Remove a device here to revoke it at once.")
                 .font(.caption).foregroundStyle(.secondary)
         }
+        .onAppear { relayDraft = remote.relayURL }
         .onReceive(clock) { now = $0 }
     }
 

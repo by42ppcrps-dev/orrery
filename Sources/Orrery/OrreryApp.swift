@@ -211,6 +211,8 @@ struct StudioCommands: Commands {
                 .disabled(model == nil)
         }
         CommandGroup(after: .toolbar) {
+            Button("Activity Across Devices…") { ActivityWindowSupport.shared.open() }
+            Divider()
             Button("Actual Size") { setFontSize(13) }
                 .keyboardShortcut("0", modifiers: .command)
             Button("Zoom In") { setFontSize(EditorTheme.fontSize + 1) }
@@ -489,6 +491,12 @@ extension SelfTest {
             }
             if CommandLine.arguments.contains("--connectors-only") {
                 await AuditConnectors.run(audit)
+                outcome.code = audit.summary()
+                outcome.done = true
+                return
+            }
+            if CommandLine.arguments.contains("--activity-only") {
+                await AuditActivity.run(audit)
                 outcome.code = audit.summary()
                 outcome.done = true
                 return

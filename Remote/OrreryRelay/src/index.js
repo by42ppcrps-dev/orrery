@@ -1,69 +1,158 @@
-// Orrery Relay: a Cloudflare Worker that lets Orrery Remote reach a Mac that is not on the
-// same network. One Durable Object per Mac ("room"); the Mac keeps an outbound WebSocket to
-// its room, the phone connects to the same room, and every frame is forwarded unchanged.
-//
-// The relay never sees plaintext: every frame is already sealed end to end by the Orrery
-// remote protocol (Curve25519 pairing, ChaCha20-Poly1305 per frame, replay counters). The
-// relay only checks that both sides present the room's token, made at pairing and carried in
-// the QR code, so strangers cannot occupy a room or read its ciphertext.
-//
-// Deploy: `npx wrangler deploy` in this folder with your Cloudflare account. Orrery then gets
-// the Worker's URL under Agent settings → Remote → Relay.
+import { DurableObject } from "cloudflare:workers";
 
+const MAX_VIEWERS = 8;
+const MAX_FRAME = 1024 * 1024;
+const MAX_PACKET = MAX_FRAME + 4096;
+const encoder = new TextEncoder();
+const decoder = new TextDecoder("utf-8", { fatal: true });
+const channelID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const close = (socket, code, reason) => { try { socket.close(code, reason); } catch {} };
+
+// Only the routing envelope is visible here. Every viewer's inner session has its own
+// end-to-end key agreement and replay counters; inner messages are never broadcast.
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const match = url.pathname.match(/^\/(mac|phone)\/([A-Za-z0-9_-]{8,64})$/);
-    if (!match) return new Response("Orrery relay: /mac/<room> or /phone/<room>", { status: 404 });
-    if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 });
+    if (!match) return new Response("Orrery relay", { status: 404 });
+    if (request.method !== "GET" || request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      return new Response("Expected a WebSocket", { status: 426 });
+    }
+    const token = url.searchParams.get("token") || "";
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(token)) return new Response("Invalid room token", { status: 403 });
     const [, side, room] = match;
-    const id = env.ROOMS.idFromName(room);
-    return env.ROOMS.get(id).fetch(new Request(`https://room/${side}?token=${encodeURIComponent(url.searchParams.get("token") || "")}`, request));
+    const destination = new URL(`https://room/${side}`);
+    destination.searchParams.set("token", token);
+    destination.searchParams.set("protocol", url.searchParams.get("protocol") || "1");
+    return env.ROOMS.get(env.ROOMS.idFromName(room)).fetch(new Request(destination, request));
   },
 };
 
-export class Room {
-  constructor(state) {
-    this.state = state;
+export class Room extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
     this.mac = null;
-    this.phones = new Set();
-    this.token = null;
-    this.state.blockConcurrencyWhile(async () => { this.token = (await this.state.storage.get("token")) || null; });
+    this.phones = new Map();
+    this.attachments = new WeakMap();
+    this.tokenHash = null;
+    ctx.blockConcurrencyWhile(async () => {
+      this.tokenHash = (await ctx.storage.get("tokenHash")) || null;
+      // Upgrade an existing room without changing any owner's pairing code.
+      const legacy = await ctx.storage.get("token");
+      if (!this.tokenHash && typeof legacy === "string") {
+        this.tokenHash = await crypto.subtle.digest("SHA-256", encoder.encode(legacy));
+        await ctx.storage.put("tokenHash", this.tokenHash);
+      }
+      if (legacy !== undefined) await ctx.storage.delete("token");
+    });
   }
 
   async fetch(request) {
     const url = new URL(request.url);
     const side = url.pathname.slice(1);
     const token = url.searchParams.get("token") || "";
-    if (token.length < 16) return new Response("token required", { status: 403 });
-    // The Mac sets the room's token on first connection; everyone after must match it.
-    if (side === "mac") {
-      if (this.token && this.token !== token) return new Response("wrong token", { status: 403 });
-      if (!this.token) { this.token = token; await this.state.storage.put("token", token); }
-    } else if (this.token !== token) {
-      return new Response("wrong token", { status: 403 });
+    const version = url.searchParams.get("protocol") || "1";
+    if (!["mac", "phone"].includes(side) || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) return new Response("Forbidden", { status: 403 });
+    if (side === "mac" && !["1", "2"].includes(version)) return new Response("Unsupported relay protocol", { status: 400 });
+    const candidate = await crypto.subtle.digest("SHA-256", encoder.encode(token));
+    const allowed = await this.ctx.blockConcurrencyWhile(async () => {
+      if (!this.tokenHash && side === "mac") {
+        await this.ctx.storage.put("tokenHash", candidate); this.tokenHash = candidate;
+      }
+      return this.tokenHash !== null && crypto.subtle.timingSafeEqual(this.tokenHash, candidate);
+    });
+    if (!allowed) return new Response("Forbidden", { status: 403 });
+    if (side === "phone") {
+      if (!this.mac) return new Response("Mac offline", { status: 503 });
+      if (this.phones.size >= MAX_VIEWERS) return new Response("Viewer limit reached", { status: 429 });
+      if (this.attachments.get(this.mac).version === "1" && this.phones.size) {
+        return new Response("Update Orrery on the Mac for multiple viewers", { status: 409 });
+      }
     }
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
-    server.accept();
+    const [client, server] = Object.values(new WebSocketPair());
+    const id = crypto.randomUUID();
+    this.attachments.set(server, { side, id, version, count: 0, window: Date.now() });
+    // The native clients send binary JSON. Workers now default binary messages to Blob.
+    server.binaryType = "arraybuffer";
+    // Explicit half-open handling completes both legs of the relay close handshake.
+    server.accept({ allowHalfOpen: true });
+    server.addEventListener("message", event => this.webSocketMessage(server, event.data));
+    server.addEventListener("close", event => this.webSocketClose(server, event.code, event.reason, event.wasClean));
+    server.addEventListener("error", () => this.webSocketError(server));
     if (side === "mac") {
-      if (this.mac) { try { this.mac.close(1000, "replaced"); } catch {} }
+      if (this.mac) this.dropMac(this.mac, "Mac reconnected");
       this.mac = server;
-      server.addEventListener("message", (event) => { for (const phone of this.phones) { try { phone.send(event.data); } catch {} } });
-      server.addEventListener("close", () => { if (this.mac === server) this.mac = null; for (const phone of this.phones) { try { phone.close(1001, "mac gone"); } catch {} } this.phones.clear(); });
+      if (version === "2") this.send(server, JSON.stringify({ type: "relay.ready" }));
     } else {
-      if (!this.mac) { server.close(1013, "mac offline"); return new Response(null, { status: 101, webSocket: client }); }
-      // One phone at a time: a newcomer replaces the previous phone, and when the phone leaves
-      // the Mac's socket is closed too, so the Mac reconnects with a clean session for the next one.
-      for (const previous of this.phones) { try { previous.close(1000, "replaced"); } catch {} }
-      this.phones.clear();
-      this.phones.add(server);
-      server.addEventListener("message", (event) => { try { this.mac?.send(event.data); } catch {} });
-      server.addEventListener("close", () => {
-        this.phones.delete(server);
-        if (this.phones.size === 0 && this.mac) { const mac = this.mac; this.mac = null; try { mac.close(1000, "phone gone"); } catch {} }
-      });
+      this.phones.set(id, server);
+      if (this.attachments.get(this.mac).version === "2") {
+        this.send(this.mac, JSON.stringify({ type: "relay.open", id }));
+      }
     }
     return new Response(null, { status: 101, webSocket: client });
   }
+
+  webSocketMessage(socket, message) {
+    const info = this.attachments.get(socket);
+    // Late frames from a replaced Mac or a closed viewer cannot reach the new session.
+    if (info.side === "mac" ? this.mac !== socket : this.phones.get(info.id) !== socket) return;
+    const now = Date.now();
+    if (now - info.window >= 1000) { info.window = now; info.count = 0; }
+    info.count += 1; this.attachments.set(socket, info);
+    if (info.count > (info.side === "mac" ? 512 : 60)) { this.remove(socket, 1008, "Message rate exceeded"); return; }
+    let text;
+    try {
+      const size = typeof message === "string" ? encoder.encode(message).byteLength : message.byteLength;
+      if (size > (info.side === "mac" ? MAX_PACKET : MAX_FRAME)) throw new Error("size");
+      text = typeof message === "string" ? message : decoder.decode(message);
+    } catch { this.remove(socket, 1009, "Invalid frame"); return; }
+    if (info.side === "mac") {
+      if (info.version === "1") {
+        const phone = this.phones.values().next().value;
+        if (phone) this.send(phone, text);
+        return;
+      }
+      let packet;
+      try { packet = JSON.parse(text); } catch { this.remove(socket, 1008, "Invalid routing"); return; }
+      if (!packet || !channelID.test(packet.id || "") || !["relay.data", "relay.close"].includes(packet.type)) {
+        this.remove(socket, 1008, "Invalid routing"); return;
+      }
+      const phone = this.phones.get(packet.id);
+      if (packet.type === "relay.close") {
+        if (phone) { this.phones.delete(packet.id); close(phone, 1000, "Session closed"); }
+      } else {
+        if (typeof packet.data !== "string" || encoder.encode(packet.data).byteLength > MAX_FRAME) {
+          this.remove(socket, 1009, "Invalid payload"); return;
+        }
+        if (phone) this.send(phone, packet.data);
+      }
+    } else if (this.mac) {
+      const packet = this.attachments.get(this.mac).version === "2"
+        ? JSON.stringify({ type: "relay.data", id: info.id, data: text }) : text;
+      if (encoder.encode(packet).byteLength > MAX_PACKET) { this.remove(socket, 1009, "Invalid frame"); return; }
+      this.send(this.mac, packet);
+    }
+  }
+
+  send(socket, data) {
+    try { socket.send(data); } catch { this.remove(socket, 1011, "Connection lost"); }
+  }
+  dropMac(socket, reason) {
+    if (this.mac !== socket) return;
+    this.mac = null;
+    const phones = [...this.phones.values()]; this.phones.clear();
+    for (const phone of phones) close(phone, 1001, reason);
+    close(socket, 1001, reason);
+  }
+  remove(socket, code, reason) {
+    const info = this.attachments.get(socket);
+    if (info.side === "mac") { this.dropMac(socket, reason); return; }
+    if (this.phones.get(info.id) !== socket) return;
+    this.phones.delete(info.id); close(socket, code, reason);
+    if (this.mac && this.attachments.get(this.mac).version === "2") {
+      this.send(this.mac, JSON.stringify({ type: "relay.close", id: info.id }));
+    } else if (this.mac) { this.dropMac(this.mac, "Viewer disconnected"); }
+  }
+  webSocketClose(socket, code, reason, wasClean) { close(socket, 1000, "Disconnected"); this.remove(socket, 1000, "Disconnected"); }
+  webSocketError(socket) { this.remove(socket, 1011, "Connection lost"); }
 }

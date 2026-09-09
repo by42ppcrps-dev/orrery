@@ -86,12 +86,12 @@ enum AuditRemote {
             let right = await control.perform(RemoteCommand(kind: .approve, text: "deny", target: approvalID, projectID: secondID))
             audit.check("the same approval works for its owning project", right == nil && chosen == "deny")
             let modeChange = await control.perform(RemoteCommand(kind: .state, target: "team", projectID: firstID))
-            audit.check("choosing a phone mode switches the viewed conversation without sending", modeChange == nil && first.assistantMode == .team && first.state.entries.isEmpty)
+            audit.check("choosing a remote mode leaves the Mac conversation unchanged", modeChange == nil && first.assistantMode == .chat && first.state.entries.isEmpty)
             first.orchestrator.installedProviders = [.grok, .claude]
             first.orchestrator.makeBackend = { ScriptedBackend(provider: $0, scripts: []) }
             first.orchestrator.start(task: "Wait for a phone stop", project: dir)
             audit.check("the Team stop fixture starts a real run", first.orchestrator.isRunning)
-            _ = await control.perform(RemoteCommand(kind: .stop, projectID: firstID))
+            _ = await control.perform(RemoteCommand(kind: .stop, target: "team", projectID: firstID))
             audit.check("phone Stop cancels Team rather than a Solo conversation", !first.orchestrator.isRunning && first.orchestrator.phase == .cancelled)
             first.assistantMode = .chat
             let busyBackend = ScriptedBackend(provider: .grok, scripts: [])
@@ -314,6 +314,7 @@ enum AuditRemote {
             audit.check("nothing accepts connections afterwards", !(await late.connect()))
             audit.check("the switch is a saved preference", !AppModel.preferences.bool(forKey: RemoteControl.enabledKey))
         }
+        await AuditActivity.run(audit)
     }
 
     private static func waitUntil(_ seconds: Double, _ condition: () -> Bool) async -> Bool {

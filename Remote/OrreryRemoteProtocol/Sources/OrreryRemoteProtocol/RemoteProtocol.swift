@@ -252,6 +252,26 @@ public struct RemoteState: Codable, Equatable, Sendable {
     public var projectID: String?
     public var projects: [Project]?
     public var capabilities: [String]?
+    /// All open projects, independent of the conversation selected by this viewer.
+    public var activities: [Activity]?
+    public var activityCount: Int?
+    public struct Activity: Codable, Equatable, Sendable, Identifiable {
+        public var id: String
+        public var projectID: String
+        public var project: String
+        public var mode: String
+        public var provider: String
+        public var title: String
+        public var status: String
+        public var isBusy: Bool
+        public var approvalCount: Int
+        public init(id: String, projectID: String, project: String, mode: String, provider: String,
+                    title: String, status: String, isBusy: Bool, approvalCount: Int = 0) {
+            self.id = id; self.projectID = projectID; self.project = project; self.mode = mode
+            self.provider = provider; self.title = title; self.status = status
+            self.isBusy = isBusy; self.approvalCount = approvalCount
+        }
+    }
 
     public struct Entry: Codable, Equatable, Sendable, Identifiable {
         public var id: String
@@ -290,8 +310,9 @@ public struct RemoteState: Codable, Equatable, Sendable {
     public var permissions: [Permission]
     public var sentAt: Date
 
-    public init(macName: String, project: String?, mode: String, provider: String, providers: [String], isBusy: Bool, status: String, entries: [Entry], permissions: [Permission], sentAt: Date = Date(), projectID: String? = nil, projects: [Project]? = nil, capabilities: [String]? = nil) {
+    public init(macName: String, project: String?, mode: String, provider: String, providers: [String], isBusy: Bool, status: String, entries: [Entry], permissions: [Permission], sentAt: Date = Date(), projectID: String? = nil, projects: [Project]? = nil, capabilities: [String]? = nil, activities: [Activity]? = nil, activityCount: Int? = nil) {
         self.projectID = projectID; self.projects = projects; self.capabilities = capabilities
+        self.activities = activities; self.activityCount = activityCount
         self.macName = macName; self.project = project; self.mode = mode; self.provider = provider; self.providers = providers
         self.isBusy = isBusy; self.status = status; self.entries = entries; self.permissions = permissions; self.sentAt = sentAt
     }
@@ -321,14 +342,39 @@ public extension RemoteState {
         value.status = String(value.status.prefix(1000))
         value.entries = Array(value.entries.suffix(40))
         value.permissions = Array(value.permissions.prefix(20))
-        value.projects = value.projects.map { Array($0.prefix(40)) }
+        value.project = value.project.map { String($0.prefix(255)) }
+        value.projects = value.projects.map { $0.prefix(40).map { .init(id: String($0.id.prefix(128)), name: String($0.name.prefix(255)), isBusy: $0.isBusy) } }
+        value.activities = value.activities.map { $0.prefix(200).map {
+            var row = $0
+            row.id = String(row.id.prefix(256)); row.projectID = String(row.projectID.prefix(128))
+            row.project = String(row.project.prefix(255)); row.title = String(row.title.prefix(255))
+            row.status = String(row.status.prefix(500)); row.mode = String(row.mode.prefix(32))
+            row.provider = String(row.provider.prefix(32)); row.approvalCount = max(0, min(row.approvalCount, 10_000))
+            return row
+        } }
+
         while RemotePayload(state: value).encoded().count > RemoteProtocol.maxFrameBytes - 4096 {
             if value.entries.count > 1 { value.entries.removeFirst() }
             else if let text = value.entries.first?.text, text.count > 1000 {
                 value.entries[0].text = String(text.prefix(text.count / 2)) + "\n\n[Continued on your Mac]"
             } else if !value.permissions.isEmpty { value.permissions.removeLast() }
+            else if value.activities?.isEmpty == false { value.activities?.removeLast() }
+            else if value.projects?.isEmpty == false { value.projects?.removeLast() }
             else { value.entries = []; value.status = "Open the Mac to view this large response."; break }
         }
         return value
+    }
+}
+
+public enum ActivityScope: String, CaseIterable, Sendable {
+    case all = "All", working = "Working", decisions = "Decisions"
+}
+public extension RemoteState {
+    func matchingActivities(query: String, scope: ActivityScope) -> [Activity] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (activities ?? []).filter { row in
+            let included = scope == .all || (scope == .working && row.isBusy) || (scope == .decisions && row.approvalCount > 0)
+            return included && (query.isEmpty || [row.project, row.title, row.provider, row.mode, row.status].contains { $0.localizedCaseInsensitiveContains(query) })
+        }
     }
 }

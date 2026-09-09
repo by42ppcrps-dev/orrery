@@ -17,8 +17,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = {'Package.swift', 'LICENSE', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'SECURITY.md', 'build-app.sh', 'Install.command'}
 TREES = {'Sources', 'Tests', 'Resources', 'Remote', '.github', 'scripts', 'public'}
-SKIP_PARTS = {'.git', '.build', 'build', '.swiftpm', '__pycache__', 'DerivedData', 'xcuserdata', '.DS_Store'}
-EXTENSIONS = {'.swift', '.py', '.sh', '.md', '.yml', '.yaml', '.json', '.plist', '.pbxproj', '.xcscheme', '.icns', '.png', '.xcprivacy'}
+SKIP_PARTS = {'.git', '.build', 'build', '.swiftpm', '__pycache__', 'DerivedData', 'xcuserdata', '.DS_Store', 'node_modules', '.wrangler'}
+EXTENSIONS = {'.swift', '.py', '.sh', '.md', '.yml', '.yaml', '.json', '.plist', '.pbxproj', '.xcscheme', '.icns', '.png', '.xcprivacy', '.js', '.toml'}
 CODE_EXTENSIONS = {'Sources': {'.swift'}, 'Tests': {'.swift', '.py'}, 'scripts': {'.py', '.sh'}}
 PUBLIC_ASSETS = {'Resources/AppIcon.icns', 'Remote/OrreryRemote/OrreryRemote/Assets.xcassets/AppIcon.appiconset/icon-1024.png'}
 PATTERNS = {
@@ -84,7 +84,7 @@ def export(root, output, private_terms=()):
             shutil.copyfile(source,target)
             target.chmod(0o755 if source.stat().st_mode & stat.S_IXUSR else 0o644)
         shutil.copyfile(root/'public/README.md',stage/'README.md')
-        (stage/'.gitignore').write_text('.build/\nbuild/\n.swiftpm/\n*.dSYM/\n.DS_Store\n__pycache__/\ndocs/verification-*/\nscratchpad/\n.env\n.env.*\n*.p12\n*.mobileprovision\n*.provisionprofile\n')
+        (stage/'.gitignore').write_text('.build/\nbuild/\n.swiftpm/\n*.dSYM/\n.DS_Store\n__pycache__/\nnode_modules/\n.wrangler/\n.public-guard-terms\ndocs/verification-*/\nscratchpad/\n.env\n.env.*\n*.p12\n*.mobileprovision\n*.provisionprofile\n')
         findings=scan(stage,private_terms)
         if findings: raise ValueError('Public export refused:\n'+'\n'.join(path+': '+category for path,category in findings))
         files={str(p.relative_to(stage)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(stage.rglob('*')) if p.is_file()}

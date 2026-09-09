@@ -1,5 +1,17 @@
 # Bug ledger
 
+## Addressed in 1.10.0
+
+| Defect | Correction and coverage |
+|---|---|
+| Remote viewing switched the Mac's selected conversation | Independent selection and confirmation before controls; real shipping-client tests. |
+| Remote Stop followed the host screen instead of the viewed agent | Explicit project, mode and provider routing; targeted cancellation checks. |
+| Only one Mac could be saved on a viewer | Shared multi-Mac hub with secure persistence, migration and failure handling. |
+| Only one phone could use a relay | Independent encrypted channels, bounded viewer counts and targeted revocation; actual Worker and Swift integration. |
+| A replaced relay socket could close a new session | Socket identity guards and explicit close coordination; reconnect and replacement tests. |
+| Binary frames changed type in the Workers runtime | Explicit array-buffer decoding; real binary WebSocket regression. |
+| Public source archive omitted relay implementation and deployment configuration | Include JavaScript and TOML while excluding dependencies and local state; archive-content regression. |
+
 ## Addressed in 1.9.0
 
 | Defect | Correction and coverage |

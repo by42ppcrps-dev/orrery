@@ -47,6 +47,7 @@ enum AppCommands {
                 symbol: "rectangle.split.2x1") { model.workspaceLayout = layout }
         }
 
+        add("show.activity", "Activity Across Devices", "Show", detail: "All open projects and agents on your paired Macs", symbol: "laptopcomputer.and.iphone") { ActivityWindowSupport.shared.open() }
         add("show.browser", "Show the Browser", "Show", detail: "In the editor area", symbol: "globe", shortcut: "⌘⌥B") { model.showBrowser() }
         add("show.simulator", "Show the iPhone Simulator", "Show", detail: "In the editor area", symbol: "iphone") { model.showSimulator() }
         add("show.code", "Show the Code editor", "Show", symbol: "chevron.left.forwardslash.chevron.right") { model.showCode() }

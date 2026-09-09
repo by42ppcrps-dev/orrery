@@ -28,6 +28,22 @@ enum AuditRelease {
             process.waitUntilExit()
             return (process.terminationStatus, String(decoding: data, as: UTF8.self))
         }
+        let exportRoot = root
+        let packageCheck = await Task.detached { () -> (Bool, String) in
+            let process = Process(), output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+            process.arguments = ["Tests/test_public_export.py", "PublicExportTests.test_relay_is_deployable_without_including_local_dependencies"]
+            process.currentDirectoryURL = exportRoot
+            process.environment = ["PATH": "/usr/bin:/bin"]
+            process.standardOutput = output; process.standardError = output
+            do { try process.run() } catch { return (false, error.localizedDescription) }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 20) { [weak process] in
+                if let process, process.isRunning { process.terminate() }
+            }
+            let data = output.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+            return (process.terminationStatus == 0, String(decoding: data, as: UTF8.self))
+        }.value
+        audit.check("the source archive includes deployable relay code and excludes private local state", packageCheck.0, packageCheck.1)
         let syntax = plan([], bashOptions: ["-n"])
         audit.check("the script parses", syntax.status == 0 && syntax.output.isEmpty, syntax.output)
         let adHoc = plan(["--plan"], environment: ["ORRERY_AUTO_SIGN": "0"])

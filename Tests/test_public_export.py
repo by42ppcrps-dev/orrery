@@ -31,6 +31,25 @@ class PublicExportTests(unittest.TestCase):
                 self.assertFalse(any('/docs/' in n or '/.git/' in n or '/build/' in n or '/scratchpad/' in n or n.endswith('/.env') or n.endswith('/auth.json') or n.endswith('/private-photo.png') for n in names))
                 self.assertEqual(archive.read('Orrery/README.md'),b'Getting started\n')
 
+    def test_relay_is_deployable_without_including_local_dependencies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); self.fixture(root)
+            for name in ['Remote/OrreryRelay/src/index.js', 'Remote/OrreryRelay/wrangler.toml', 'Remote/OrreryRelay/package.json', 'Remote/OrreryRelay/tests/serve.js']:
+                p=root/name; p.parent.mkdir(parents=True,exist_ok=True); p.write_text('public source')
+            for name in ['Remote/OrreryRelay/node_modules/private/config.json', 'Remote/OrreryRelay/.wrangler/state.json']:
+                p=root/name; p.parent.mkdir(parents=True,exist_ok=True); p.write_text('must not ship')
+            out=root/'result.zip'; module.export(root,out)
+            with zipfile.ZipFile(out) as archive:
+                names=archive.namelist()
+                self.assertIn('Orrery/Remote/OrreryRelay/src/index.js', names)
+                self.assertIn('Orrery/Remote/OrreryRelay/wrangler.toml', names)
+                self.assertIn('Orrery/Remote/OrreryRelay/tests/serve.js', names)
+                self.assertFalse(any('/node_modules/' in n or '/.wrangler/' in n for n in names))
+                ignored = archive.read('Orrery/.gitignore').decode().splitlines()
+                self.assertIn('node_modules/', ignored)
+                self.assertIn('.wrangler/', ignored)
+                self.assertIn('.public-guard-terms', ignored)
+
     def test_secret_refuses_export_without_printing_value(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); self.fixture(root)

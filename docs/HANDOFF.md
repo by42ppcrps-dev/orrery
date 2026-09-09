@@ -7,13 +7,16 @@ Read README.md for current installation and behavior, CHANGELOG.md for shipped c
 - `Sources/Orrery/Orchestrator`: Team scheduling, roles, session reuse and direct context.
 - `Sources/Orrery/Tasks`: bounded task persistence and isolated working copies.
 - `Sources/Orrery/Views`: native workspace, Team, setup, connections and settings.
+- `Remote/OrreryRemoteProtocol`: shared encrypted protocol, multi-Mac client, secure pairing store and dashboard.
+- `Remote/OrreryRelay`: optional multi-viewer Worker and real network regression tests.
+- `Sources/Orrery/Remote`: local host state and per-viewer routing.
 - `Sources/Orrery/Audit`: repeatable functional and layout checks.
 - `scripts/public_guard.py`: committed-tree and history privacy checks.
 - `scripts/export_public.py`: allowlisted, history-free source package.
 
 ## Verification and release
 
-Run `swift build`, one `.build/debug/Orrery --audit`, `swift test`, and the Python unittest discovery shown in README. Focused audit suites help reproduce regressions. Use exact, reversible mutations to demonstrate regression checks fail; do not restore entire files over another contributor's work. Skips need an explicit missing prerequisite and reason.
+Install relay test dependencies with `npm ci` in `Remote/OrreryRelay`, then run `npm test` there. Run `swift build`, one `.build/debug/Orrery --audit`, `swift test`, and the Python unittest discovery shown in README. Focused audit suites help reproduce regressions. Use exact, reversible mutations to demonstrate regression checks fail; do not restore entire files over another contributor's work. Skips need an explicit missing prerequisite and reason.
 
 Build locally with `build-app.sh`. Increment VERSION and BUILD for installed changes. Quit an idle app before replacing it, retain the previous bundle and verify the installed version. Distribution binaries require Developer ID and successful notarization; source releases do not include signing credentials.
 
