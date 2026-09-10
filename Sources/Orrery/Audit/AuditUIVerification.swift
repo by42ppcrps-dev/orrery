@@ -1,5 +1,6 @@
 import AppKit
 import Network
+import SwiftUI
 
 /// The local UI preview against a real loopback HTTP server: URL boundaries, DOM inspection,
 /// selector actions, console/navigation evidence, blocked outside navigation, bounded PNG
@@ -99,12 +100,22 @@ enum AuditUIVerification {
                 do { try await controller.open("http://example.com/"); audit.check("open refuses outside hosts", false) }
                 catch { audit.check("open refuses outside hosts", true) }
                 audit.check("no web process exists before a local page opens", controller.webView == nil)
-                try await controller.open(local)
-                // WebKit paints only inside a window; the sheet provides one in the app.
-                let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.borderless],
+                // Mount the shipping sheet before opening, just as the UI does. Adding the
+                // WKWebView directly would hide a broken SwiftUI-to-AppKit embedding path.
+                let host = NSHostingView(rootView: UIVerificationView(controller: controller))
+                let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 720), styleMask: [.borderless],
                                       backing: .buffered, defer: false)
-                if let view = controller.webView { window.contentView?.addSubview(view) }
+                window.contentView = host
+                defer { controller.stop(); window.contentView = nil }
+                window.layoutIfNeeded(); host.layoutSubtreeIfNeeded()
+                try await controller.open(local)
+                try await Task.sleep(for: .milliseconds(100))
+                host.layoutSubtreeIfNeeded()
                 audit.check("local page loads", controller.webView != nil && !controller.isLoading)
+                audit.check("the sheet mounts its loaded web view", controller.webView?.isDescendant(of: host) == true)
+                audit.check("the mounted page has visible preview bounds", controller.webView.map {
+                    !$0.isHiddenOrHasHiddenAncestor && $0.visibleRect.width >= 300 && $0.visibleRect.height >= 200
+                } == true, "frame \(String(describing: controller.webView?.frame)), visible \(String(describing: controller.webView?.visibleRect))")
                 let inspection = try await controller.inspect()
                 audit.check("inspection reports the page title", inspection.contains("Audit Preview"))
                 audit.check("inspection lists selectors for interactive elements", inspection.contains("#go"))
@@ -150,6 +161,7 @@ enum AuditUIVerification {
                 do { _ = try await controller.inspect(); audit.check("stopped preview refuses actions", false) }
                 catch { audit.check("stopped preview refuses actions", true) }
 
+                window.contentView = NSView(frame: window.contentLayoutRect)
                 audit.section("Verification — agent preview tools through the computer socket")
                 let model = AppModel(trust: .forAudit)
                 model.installed = [:]
