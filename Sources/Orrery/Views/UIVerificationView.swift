@@ -11,6 +11,7 @@ struct UIVerificationView: View {
     @State private var typedText = ""
     @State private var busy = false
     @State private var result = ""
+    @State private var fitsViewport = true
 
     private var pageReady: Bool { controller.webView != nil && !controller.isLoading && !busy }
 
@@ -52,6 +53,10 @@ struct UIVerificationView: View {
                 }
                 .labelsHidden().frame(width: 190)
                 .help("Preview size. Change it before capturing evidence.")
+                Toggle("Fit", isOn: $fitsViewport)
+                    .toggleStyle(.button)
+                    .accessibilityLabel("Fit preview")
+                    .help("Show the whole page, or turn off Fit to inspect it at actual size.")
             }
         }
     }
@@ -59,7 +64,7 @@ struct UIVerificationView: View {
     private var preview: some View {
         ZStack {
             if controller.webView != nil {
-                UIPreviewHost(webView: controller.webView, size: controller.viewport.size)
+                UIPreviewHost(webView: controller.webView, size: controller.viewport.size, fitsViewport: fitsViewport)
             } else {
                 ContentUnavailableView("No local preview open", systemImage: "macwindow",
                     description: Text("Start your project's development server, enter its address on localhost, 127.0.0.1 or [::1], then choose Open. Outside sites are refused."))
@@ -170,9 +175,12 @@ struct UIVerificationView: View {
 private struct UIPreviewHost: NSViewRepresentable {
     let webView: WKWebView?
     let size: CGSize
+    let fitsViewport: Bool
 
-    func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView()
+    func makeNSView(context: Context) -> UIPreviewScrollView {
+        let scroll = UIPreviewScrollView()
+        scroll.minMagnification = 0.1
+        scroll.maxMagnification = 1
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -183,7 +191,9 @@ private struct UIPreviewHost: NSViewRepresentable {
         return scroll
     }
 
-    func updateNSView(_ scroll: NSScrollView, context: Context) {
+    func updateNSView(_ scroll: UIPreviewScrollView, context: Context) {
+        scroll.viewportSize = size
+        scroll.fitsViewport = fitsViewport
         guard let container = scroll.documentView as? TopAnchoredContainer else { return }
         container.frame = CGRect(origin: .zero, size: size)
         if let webView {
@@ -198,9 +208,29 @@ private struct UIPreviewHost: NSViewRepresentable {
         }
     }
 
-    static func dismantleNSView(_ scroll: NSScrollView, coordinator: ()) {
+    static func dismantleNSView(_ scroll: UIPreviewScrollView, coordinator: ()) {
         // Leave the controller's web view alive; the sheet may reopen while the agent works.
         (scroll.documentView as? TopAnchoredContainer)?.subviews.forEach { $0.removeFromSuperview() }
+    }
+}
+
+/// Scale the presentation without changing the page's CSS viewport or capture dimensions.
+/// Recompute after layout so resizing the sheet and changing devices both keep the page visible.
+final class UIPreviewScrollView: NSScrollView {
+    var viewportSize = CGSize.zero { didSet { needsLayout = true } }
+    var fitsViewport = true { didSet { needsLayout = true } }
+
+    override func layout() {
+        super.layout()
+        guard viewportSize.width > 0, viewportSize.height > 0,
+              contentSize.width > 0, contentSize.height > 0 else { return }
+        let scale = fitsViewport
+            ? min(1, contentSize.width / viewportSize.width, contentSize.height / viewportSize.height)
+            : 1
+        let bounded = max(minMagnification, min(maxMagnification, scale))
+        if abs(magnification - bounded) > 0.0001 {
+            setMagnification(bounded, centeredAt: .zero)
+        }
     }
 }
 

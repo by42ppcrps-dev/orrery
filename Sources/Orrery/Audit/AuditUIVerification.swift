@@ -116,7 +116,28 @@ enum AuditUIVerification {
                 audit.check("the mounted page has visible preview bounds", controller.webView.map {
                     !$0.isHiddenOrHasHiddenAncestor && $0.visibleRect.width >= 300 && $0.visibleRect.height >= 200
                 } == true, "frame \(String(describing: controller.webView?.frame)), visible \(String(describing: controller.webView?.visibleRect))")
+                for size in [NSSize(width: 820, height: 520), NSSize(width: 1080, height: 720), NSSize(width: 1400, height: 840)] {
+                    window.setContentSize(size)
+                    window.layoutIfNeeded(); host.layoutSubtreeIfNeeded()
+                    try await Task.sleep(for: .milliseconds(100))
+                    host.layoutSubtreeIfNeeded()
+                    audit.check("Fit shows the entire page at \(Int(size.width))-point sheet width", controller.webView.map {
+                        $0.visibleRect.insetBy(dx: -2, dy: -2).contains($0.bounds)
+                    } == true, "visible \(String(describing: controller.webView?.visibleRect)), page \(String(describing: controller.webView?.bounds))")
+                }
+                var ancestor = controller.webView?.superview
+                while ancestor != nil && !(ancestor is UIPreviewScrollView) { ancestor = ancestor?.superview }
+                if let scroll = ancestor as? UIPreviewScrollView {
+                    scroll.fitsViewport = false; scroll.layoutSubtreeIfNeeded()
+                    audit.check("actual-size preview restores one-to-one scale and scrolling", abs(scroll.magnification - 1) < 0.0001
+                                && controller.webView.map { $0.visibleRect.width < $0.bounds.width } == true)
+                    scroll.fitsViewport = true; scroll.layoutSubtreeIfNeeded()
+                    audit.check("returning to Fit makes the whole page visible again", controller.webView.map {
+                        $0.visibleRect.insetBy(dx: -2, dy: -2).contains($0.bounds)
+                    } == true)
+                } else { audit.check("the shipping preview exposes its sizing container", false) }
                 let inspection = try await controller.inspect()
+                audit.check("fitting the preview preserves the page's desktop layout width", inspection.contains("\"width\":1280"))
                 audit.check("inspection reports the page title", inspection.contains("Audit Preview"))
                 audit.check("inspection lists selectors for interactive elements", inspection.contains("#go"))
                 audit.check("inspection omits password fields", !inspection.contains("#secret"))
@@ -147,7 +168,16 @@ enum AuditUIVerification {
                 audit.check("navigation outside the local server is blocked", controller.events.contains { $0.kind == "blocked" })
                 audit.equal("the local page remains open after a blocked navigation", controller.webView?.url?.host, "127.0.0.1")
                 controller.viewport = .mobile
+                try await Task.sleep(for: .milliseconds(100))
+                host.layoutSubtreeIfNeeded()
+                audit.check("changing devices refits the whole mobile viewport", controller.webView.map {
+                    $0.visibleRect.insetBy(dx: -2, dy: -2).contains($0.bounds)
+                } == true)
                 let capture = try await controller.capture(taskID: UUID())
+                let bitmap = NSBitmapImageRep(data: capture.png)
+                audit.check("fitted captures retain full viewport resolution and aspect ratio", bitmap.map {
+                    $0.pixelsWide >= 390 && abs(Double($0.pixelsWide) / Double($0.pixelsHigh) - 390.0 / 844.0) < 0.005
+                } == true)
                 audit.check("capture produces PNG bytes", capture.png.starts(with: [0x89, 0x50, 0x4E, 0x47]) && capture.png.count > 1_000)
                 audit.check("capture carries recorded events", capture.events.contains { $0.kind == "error" } && capture.events.contains { $0.kind == "blocked" })
                 audit.check("capture records the viewport", capture.viewport == .mobile)
